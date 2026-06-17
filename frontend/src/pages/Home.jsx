@@ -68,14 +68,15 @@ export default function Home() {
       });
 
       if (!res.ok) {
-        throw new Error('Failed to start research');
+        const errorData = await res.json().catch(() => ({}));
+        throw new Error(errorData.detail || 'Failed to start research');
       }
 
       const data = await res.json();
       navigate(`/research/${data.job_id}`, { state: { dossierId: data.dossier_id } });
     } catch (e) {
       console.error(e);
-      setError('Unable to initiate research. Please check backend connection.');
+      setError(e.message || 'Unable to initiate research. Please check backend connection.');
       setLoading(false);
     }
   };

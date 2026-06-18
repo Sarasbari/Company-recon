@@ -20,12 +20,18 @@ async def run_agent(company_name: str, queue: asyncio.Queue = None) -> dict:
     if queue:
         await queue.put({"type": "start", "company": company_name})
         
-    api_key = os.getenv("ANTHROPIC_API_KEY")
-    if not api_key or api_key == "mock_key":
+    gemini_key = os.getenv("GEMINI_API_KEY")
+    anthropic_key = os.getenv("ANTHROPIC_API_KEY")
+
+    # Prioritize Gemini if its API key is set
+    if gemini_key and gemini_key not in ("mock_key", "your_gemini_api_key_here", ""):
+        return await run_gemini_agent(company_name, queue, start_time)
+
+    if not anthropic_key or anthropic_key in ("mock_key", "your_anthropic_api_key_here", ""):
         return await run_mock_agent(company_name, queue, start_time)
 
     # Real agent logic
-    client = AsyncAnthropic(api_key=api_key)
+    client = AsyncAnthropic(api_key=anthropic_key)
     system_prompt = build_system_prompt(company_name)
     
     tools = [
@@ -195,6 +201,186 @@ async def run_agent(company_name: str, queue: asyncio.Queue = None) -> dict:
         if queue:
             await queue.put({"type": "error", "message": error_msg})
         raise e
+
+async def run_gemini_agent(company_name: str, queue: asyncio.Queue = None, start_time: float = None) -> dict:
+    """
+    Runs the ReAct loop using the free Google Gemini API.
+    """
+    api_key = os.getenv("GEMINI_API_KEY")
+    url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key={api_key}"
+    system_prompt = build_system_prompt(company_name)
+    
+    gemini_tools = [{
+        "functionDeclarations": [
+            {
+                "name": "web_search",
+                "description": "Search the web for information about a company. Use specific queries. Prefer queries like 'Razorpay funding 2024 Crunchbase' over 'Razorpay'. Returns top 5 results with title, URL, and snippet.",
+                "parameters": {
+                    "type": "OBJECT",
+                    "properties": {
+                        "query": {
+                            "type": "STRING",
+                            "description": "The search query. Be specific. Include company name + topic."
+                        }
+                    },
+                    "required": ["query"]
+                }
+            },
+            {
+                "name": "fetch_page",
+                "description": "Fetch and extract readable text content from a URL. Use for official company websites, press releases, news articles. Do NOT use for LinkedIn or Crunchbase direct pages — they block scrapers. Prefer Tavily Extract for those.",
+                "parameters": {
+                    "type": "OBJECT",
+                    "properties": {
+                        "url": {
+                            "type": "STRING",
+                            "description": "The full URL to fetch."
+                        }
+                    },
+                    "required": ["url"]
+                }
+            }
+        ]
+    }]
+
+    contents = []
+    iteration = 0
+    tool_calls_count = 0
+    sources_visited = set()
+
+    import httpx
+    async with httpx.AsyncClient(timeout=30.0) as client:
+        while iteration < MAX_ITERATIONS:
+            payload = {
+                "contents": contents,
+                "systemInstruction": {
+                    "parts": [{"text": system_prompt}]
+                },
+                "tools": gemini_tools
+            }
+            
+            if not contents:
+                contents.append({
+                    "role": "user",
+                    "parts": [{"text": f"Start researching {company_name}."}]
+                })
+            
+            response = await client.post(url, json=payload)
+            response.raise_for_status()
+            res_data = response.json()
+            
+            candidates = res_data.get("candidates", [])
+            if not candidates:
+                break
+                
+            first_candidate = candidates[0]
+            content_out = first_candidate.get("content", {})
+            parts = content_out.get("parts", [])
+            
+            contents.append(content_out)
+            
+            reasoning_text = ""
+            function_calls = []
+            
+            for part in parts:
+                if "text" in part:
+                    reasoning_text += part["text"]
+                if "functionCall" in part:
+                    function_calls.append(part["functionCall"])
+            
+            if reasoning_text and queue:
+                await queue.put({"type": "reason", "text": reasoning_text})
+                
+            if not function_calls:
+                break
+                
+            tool_results_parts = []
+            for call in function_calls:
+                tool_calls_count += 1
+                tool_name = call["name"]
+                tool_input = call["args"]
+                
+                if tool_name == "fetch_page" and "url" in tool_input:
+                    sources_visited.add(tool_input["url"])
+                    
+                if queue:
+                    await queue.put({
+                        "type": "action",
+                        "tool": tool_name,
+                        "input": tool_input
+                    })
+                    
+                result = await dispatch_tool(tool_name, tool_input)
+                
+                if queue:
+                    summary = result[:300] + "..." if len(result) > 300 else result
+                    await queue.put({
+                        "type": "observation",
+                        "tool": tool_name,
+                        "summary": summary
+                    })
+                    
+                tool_results_parts.append({
+                    "functionResponse": {
+                        "name": tool_name,
+                        "response": {"result": result}
+                    }
+                })
+                
+            contents.append({
+                "role": "user",
+                "parts": tool_results_parts
+            })
+            
+            iteration += 1
+
+        duration = int(time.time() - start_time)
+        if queue:
+            await queue.put({"type": "reason", "text": "Synthesizing research logs into structured dossier..."})
+            
+        synthesis_payload = {
+            "contents": contents + [{
+                "role": "user",
+                "parts": [{"text": SYNTHESIS_PROMPT}]
+            }],
+            "systemInstruction": {
+                "parts": [{"text": "You are a professional B2B sales analyst."}]
+            },
+            "generationConfig": {
+                "responseMimeType": "application/json"
+            }
+        }
+        
+        synth_res = await client.post(url, json=synthesis_payload)
+        synth_res.raise_for_status()
+        synth_data = synth_res.json()
+        
+        dossier_text = synth_data["candidates"][0]["content"]["parts"][0]["text"]
+        
+        dossier_text = dossier_text.strip()
+        if dossier_text.startswith("```json"):
+            dossier_text = dossier_text[7:]
+        if dossier_text.endswith("```"):
+            dossier_text = dossier_text[:-3]
+        dossier_text = dossier_text.strip()
+        
+        dossier = json.loads(dossier_text)
+        
+        dossier["agent_metadata"] = {
+            "iterations": iteration,
+            "tool_calls": tool_calls_count,
+            "duration_seconds": duration,
+            "model_used": "gemini-1.5-flash"
+        }
+        
+        existing_sources = set(dossier.get("sources", []))
+        existing_sources.update(sources_visited)
+        dossier["sources"] = list(existing_sources)
+
+        if queue:
+            await queue.put({"type": "complete", "dossier": dossier})
+
+        return dossier
 
 async def run_mock_agent(company_name: str, queue: asyncio.Queue, start_time: float) -> dict:
     """

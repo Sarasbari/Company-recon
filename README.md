@@ -69,7 +69,8 @@ This project supports **Mock Mode** out-of-the-box! If you don't have active API
    cp .env.template .env
    ```
 2. By default, `.env` is initialized with mock keys. To use real APIs, fill in the actual keys:
-   - `ANTHROPIC_API_KEY`: Anthropic developer key (for Claude 3.5 Haiku & Sonnet)
+   - `GEMINI_API_KEY`: Google Gemini Developer API key (free tier alternative for Gemini 1.5 Flash)
+   - `ANTHROPIC_API_KEY`: Anthropic developer key (optional alternative for Claude 3.5 Haiku & Sonnet)
    - `TAVILY_API_KEY`: Tavily Search API key (free tier is sufficient)
    - `SUPABASE_URL` & `SUPABASE_SERVICE_ROLE_KEY`: Supabase project database keys
    - `CLERK_SECRET_KEY` & `CLERK_PUBLISHABLE_KEY`: Clerk authentication keys

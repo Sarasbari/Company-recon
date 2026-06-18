@@ -207,7 +207,7 @@ async def run_gemini_agent(company_name: str, queue: asyncio.Queue = None, start
     Runs the ReAct loop using the free Google Gemini API.
     """
     api_key = os.getenv("GEMINI_API_KEY")
-    url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key={api_key}"
+    url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key={api_key}"
     system_prompt = build_system_prompt(company_name)
     
     gemini_tools = [{
@@ -370,7 +370,7 @@ async def run_gemini_agent(company_name: str, queue: asyncio.Queue = None, start
             "iterations": iteration,
             "tool_calls": tool_calls_count,
             "duration_seconds": duration,
-            "model_used": "gemini-1.5-flash"
+            "model_used": "gemini-2.0-flash"
         }
         
         existing_sources = set(dossier.get("sources", []))

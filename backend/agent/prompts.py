@@ -29,20 +29,25 @@ Be extremely rigorous. Eliminate placeholders, TODOs, and hypothetical statement
 If any field could not be found, set it to "Data unavailable — sources blocked or not found" (or a suitable default as shown in the schema).
 Construct 3 highly compelling, specific, and actionable sales talking points that a rep can use for outreach based on the gathered details.
 
+### Strict Data Integrity Constraints:
+- ONLY use information explicitly found in the research logs for the target company.
+- Never use prior knowledge or bleed details from example schemas (e.g. do NOT output Razorpay's $741.5M funding or Series F stage unless the logs explicitly state them for the queried company).
+- If any required field (e.g., funding details, headquarters) is not present in the research logs, set its value to "Data unavailable" or empty lists/objects. Do NOT invent plausible values.
+
 ### Dossier JSON Schema:
 {
   "company": "Company Name",
   "researched_at": "ISO-8601 Timestamp",
-  "overview": "Overview paragraph (1-2 paragraphs)",
+  "overview": "Overview paragraph (1-2 paragraphs summarizing business scope, value proposition, and targets)",
   "industry": "Industry classification",
-  "business_model": "Business model description (e.g., B2B SaaS, payment processor)",
-  "founded": "Founding year (e.g., 2014)",
+  "business_model": "Business model description (e.g., B2B Subscription SaaS, Transactional commission, Direct-to-Consumer)",
+  "founded": "Founding year (4-digit integer, e.g., 2018)",
   "headquarters": "City, State/Country",
-  "headcount": "Headcount estimate (e.g., 1001-5000 (estimated))",
+  "headcount": "Headcount estimate (e.g., 50-100, 1000-5000)",
   "funding": {
-    "stage": "Funding stage (e.g., Series F, Bootstrapped, Public)",
-    "total_raised": "Total funding raised (e.g., $741.5M)",
-    "last_round": "Last round details (e.g., $375M in Dec 2021)",
+    "stage": "Funding stage (e.g., Series A, Seed, Bootstrapped, Public)",
+    "total_raised": "Total funding raised in USD/local currency (e.g., $25M, $1.2B, Bootstrapped)",
+    "last_round": "Details of last funding round (e.g., $10M Series A in Jan 2025, None)",
     "investors": ["Investor Name 1", "Investor Name 2"]
   },
   "key_people": [

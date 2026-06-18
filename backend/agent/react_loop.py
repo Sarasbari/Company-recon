@@ -8,11 +8,70 @@ from backend.tools.dispatcher import dispatch_tool
 
 MAX_ITERATIONS = 12
 
+def validate_dossier_company(requested_name: str, dossier: dict) -> bool:
+    """
+    Asserts that the generated dossier's company name matches the requested company name (fuzzy/substring check).
+    """
+    if not dossier or "company" not in dossier:
+        return False
+    
+    req_clean = requested_name.strip().lower()
+    gen_clean = str(dossier["company"]).strip().lower()
+    
+    # Check simple substring matches
+    if req_clean in gen_clean or gen_clean in req_clean:
+        return True
+        
+    # Clean up corporate suffixes (e.g. Inc, Ltd, Co, Corp, Limited)
+    suffixes = ["inc.", "inc", "ltd.", "ltd", "corp.", "corp", "co.", "co", "limited", "pvt", "private"]
+    for s in suffixes:
+        req_clean = req_clean.replace(s, "")
+        gen_clean = gen_clean.replace(s, "")
+        
+    req_clean = req_clean.strip()
+    gen_clean = gen_clean.strip()
+    
+    if req_clean in gen_clean or gen_clean in req_clean:
+        return True
+        
+    return False
+
+def populate_agent_metadata(dossier: dict, iteration: int, tool_calls: int, duration: int, model: str, queue: asyncio.Queue = None):
+    """
+    Safely populates agent metadata in the dossier, including execution steps if the queue has history.
+    """
+    dossier["agent_metadata"] = {
+        "iterations": iteration,
+        "tool_calls": tool_calls,
+        "duration_seconds": duration,
+        "model_used": model
+    }
+    if queue and hasattr(queue, "history"):
+        dossier["agent_metadata"]["steps"] = list(queue.history)
+
 async def run_agent(company_name: str, queue: asyncio.Queue = None) -> dict:
     """
-    Executes the ReAct agent loop for a company name.
-    Streams progress events to the provided asyncio.Queue.
-    Returns the final synthesized dossier.
+    Executes the ReAct agent loop for a company name with retry on validation failure.
+    """
+    for attempt in range(2):
+        try:
+            dossier = await _run_agent_internal(company_name, queue)
+            if validate_dossier_company(company_name, dossier):
+                return dossier
+                
+            print(f"Validation warning (Attempt {attempt + 1}): generated company name '{dossier.get('company')}' did not match requested '{company_name}'.")
+            if attempt == 1:
+                raise ValueError(f"Dossier validation failed: generated company '{dossier.get('company')}' does not match requested '{company_name}' after retry.")
+                
+            if queue:
+                await queue.put({"type": "reason", "text": f"Dossier validation failed (got '{dossier.get('company')}'). Retrying research for '{company_name}'..."})
+        except Exception as e:
+            if attempt == 1:
+                raise e
+
+async def _run_agent_internal(company_name: str, queue: asyncio.Queue = None) -> dict:
+    """
+    Internal ReAct agent runner.
     """
     start_time = time.time()
     
@@ -179,12 +238,7 @@ async def run_agent(company_name: str, queue: asyncio.Queue = None) -> dict:
         dossier = json.loads(dossier_text)
         
         # Populate agent metadata
-        dossier["agent_metadata"] = {
-            "iterations": iteration,
-            "tool_calls": tool_calls_count,
-            "duration_seconds": duration,
-            "model_used": "claude-3-5-haiku + claude-3-5-sonnet"
-        }
+        populate_agent_metadata(dossier, iteration, tool_calls_count, duration, "claude-3-5-haiku + claude-3-5-sonnet", queue)
         
         # Merge sources visited
         existing_sources = set(dossier.get("sources", []))
@@ -366,12 +420,7 @@ async def run_gemini_agent(company_name: str, queue: asyncio.Queue = None, start
         
         dossier = json.loads(dossier_text)
         
-        dossier["agent_metadata"] = {
-            "iterations": iteration,
-            "tool_calls": tool_calls_count,
-            "duration_seconds": duration,
-            "model_used": "gemini-2.0-flash"
-        }
+        populate_agent_metadata(dossier, iteration, tool_calls_count, duration, "gemini-2.0-flash", queue)
         
         existing_sources = set(dossier.get("sources", []))
         existing_sources.update(sources_visited)
@@ -387,30 +436,321 @@ async def run_mock_agent(company_name: str, queue: asyncio.Queue, start_time: fl
     Simulates a ReAct agent loop for testing when Anthropic/Tavily keys are not set.
     """
     comp = company_name.strip()
-    
-    # Mock events matching ReAct style
+    comp_lower = comp.lower()
+
+    # Pre-defined mock data for specific test companies
+    mock_db = {
+        "zomato": {
+            "overview": "Zomato is a leading multinational restaurant aggregator and food delivery company. It provides information, menus, and user-reviews of restaurants as well as food delivery options from partner restaurants in select cities.",
+            "industry": "Internet / Food Delivery / Quick Commerce",
+            "business_model": "Transactional Commission / Hyperlocal Logistics",
+            "founded": "2008",
+            "headquarters": "Gurugram, Haryana, India",
+            "headcount": "5001-10000 (estimated)",
+            "funding": {
+                "stage": "Public (NSE: ZOMATO)",
+                "total_raised": "$2.1B",
+                "last_round": "IPO (July 2021)",
+                "investors": ["Info Edge", "Ant Group", "Tiger Global Management", "Temasek Holdings"]
+            },
+            "key_people": [
+                { "name": "Deepinder Goyal", "role": "CEO & Founder" },
+                { "name": "Akshant Goyal", "role": "CFO" }
+            ],
+            "recent_news": [
+                {
+                    "title": "Zomato's Blinkit expansion outpaces competitors in major metro regions",
+                    "url": "https://economictimes.indiatimes.com/zomato-blinkit-expansion",
+                    "date": "2 weeks ago",
+                    "summary": "Blinkit has significantly scaled its dark store count to meet surging demand in Noida, Gurugram, and Bengaluru."
+                },
+                {
+                    "title": "Zomato announces record quarterly profits matching expectations",
+                    "url": "https://moneycontrol.com/zomato-q4-results",
+                    "date": "1 month ago",
+                    "summary": "Consolidated net profit rose as margins improved in both food delivery and quick commerce segments."
+                }
+            ],
+            "talking_points": [
+                "Zomato is aggressively scaling its quick commerce arm, Blinkit. Suggesting solutions tailored for dark store routing could support their high-density logistics optimization.",
+                "With deep market share in Indian metropolitan areas, pitch scaling solutions that help Zomato expand into tier-2 and tier-3 towns efficiently.",
+                "Zomato's continuous focus on customer retention through loyalty benefits makes personalization tech a high-value pitch for their customer support teams."
+            ],
+            "sources": ["https://www.zomato.com", "https://economictimes.indiatimes.com", "https://moneycontrol.com"]
+        },
+        "stripe": {
+            "overview": "Stripe is a global financial infrastructure platform that lets businesses accept payments, grow their revenue, and run their operations online. It serves millions of companies, from startups to large enterprises.",
+            "industry": "Fintech / Payment Processing",
+            "business_model": "B2B SaaS / Transaction Fee",
+            "founded": "2010",
+            "headquarters": "San Francisco, California, USA",
+            "headcount": "5001-10000 (estimated)",
+            "funding": {
+                "stage": "Private (Late Stage)",
+                "total_raised": "$8.7B",
+                "last_round": "$6.5B (March 2023)",
+                "investors": ["Sequoia Capital", "Andreessen Horowitz", "Thrive Capital", "Founders Fund"]
+            },
+            "key_people": [
+                { "name": "Patrick Collison", "role": "CEO & Co-founder" },
+                { "name": "John Collison", "role": "President & Co-founder" }
+            ],
+            "recent_news": [
+                {
+                    "title": "Stripe launches new AI-powered checkout routing features",
+                    "url": "https://techcrunch.com/stripe-ai-checkout",
+                    "date": "10 days ago",
+                    "summary": "The update automatically routes payments through the most cost-effective provider to optimize conversion rates."
+                },
+                {
+                    "title": "Fintech leader Stripe crosses $1 trillion in total payment volume",
+                    "url": "https://wsj.com/stripe-1-trillion-tpv",
+                    "date": "1 month ago",
+                    "summary": "Annual payment volume grew significantly as enterprises shifted more volume to Stripe's core APIs."
+                }
+            ],
+            "talking_points": [
+                "Stripe's crossing of $1T in TPV presents a major scale opportunity. Propose high-availability cloud migration integrations for high-volume transactions.",
+                "With their newly launched AI-powered checkout, show how your solution helps validate and secure input data before reaching Stripe APIs.",
+                "Since Stripe serves millions of platforms globally, pitch localized billing compliance management tools for their cross-border users."
+            ],
+            "sources": ["https://stripe.com", "https://techcrunch.com", "https://www.wsj.com"]
+        },
+        "tata motors": {
+            "overview": "Tata Motors Limited is a leading global automobile manufacturer of cars, utility vehicles, buses, trucks, and defense vehicles. It is part of the multi-billion dollar Tata group.",
+            "industry": "Automotive / Manufacturing",
+            "business_model": "Direct Sales / B2B Distribution",
+            "founded": "1945",
+            "headquarters": "Mumbai, Maharashtra, India",
+            "headcount": "10000+ (estimated)",
+            "funding": {
+                "stage": "Public (NSE: TATAMOTORS)",
+                "total_raised": "$2.3B",
+                "last_round": "Public Markets",
+                "investors": ["Tata Sons", "Life Insurance Corporation of India", "Mutual Funds"]
+            },
+            "key_people": [
+                { "name": "Natarajan Chandrasekaran", "role": "Chairman" },
+                { "name": "Guenter Butschek", "role": "CEO & Managing Director" }
+            ],
+            "recent_news": [
+                {
+                    "title": "Tata Motors dominates Indian EV passenger vehicle sector",
+                    "url": "https://autocarindia.com/tata-motors-ev-dominance",
+                    "date": "3 weeks ago",
+                    "summary": "Tata Motors reports recording highest EV sales in India, powered by demand for Nexon and Punch EV models."
+                },
+                {
+                    "title": "Tata Motors signs memorandum for manufacturing expansion",
+                    "url": "https://reuters.com/tata-motors-tamil-nadu-plant",
+                    "date": "2 months ago",
+                    "summary": "The automaker will invest in setting up a state-of-the-art vehicle assembly plant in Tamil Nadu."
+                }
+            ],
+            "talking_points": [
+                "Tata Motors' EV sector dominance is a key vector. Propose smart battery management system optimizations for passenger fleets.",
+                "Given their manufacturing expansion in Tamil Nadu, offer automated factory logistics scheduling integrations.",
+                "Highlight how your supply chain validation platform can help Tata Motors audit compliance across regional suppliers."
+            ],
+            "sources": ["https://www.tatamotors.com", "https://www.reuters.com", "https://www.autocarindia.com"]
+        },
+        "notion": {
+            "overview": "Notion is a single space where you can think, write, and plan. Capture thoughts, manage projects, or even run an entire company — and customize it exactly the way you want.",
+            "industry": "Software / B2B SaaS / Collaboration",
+            "business_model": "B2C / B2B Subscription SaaS",
+            "founded": "2013",
+            "headquarters": "San Francisco, California, USA",
+            "headcount": "501-1000 (estimated)",
+            "funding": {
+                "stage": "Private (Late Stage)",
+                "total_raised": "$343M",
+                "last_round": "$275M (October 2021)",
+                "investors": ["Index Ventures", "Sequoia Capital", "Coatue Management", "Base10 Partners"]
+            },
+            "key_people": [
+                { "name": "Ivan Zhao", "role": "CEO & Co-founder" },
+                { "name": "Simon Last", "role": "Co-founder" }
+            ],
+            "recent_news": [
+                {
+                    "title": "Notion launches Notion Sites to revolutionize public wikis",
+                    "url": "https://techcrunch.com/notion-sites-launch",
+                    "date": "1 week ago",
+                    "summary": "The feature allows users to deploy high-speed, customized websites directly from their workspace databases."
+                },
+                {
+                    "title": "Notion integrates advanced generative AI features into core editor",
+                    "url": "https://theverge.com/notion-ai-workspace",
+                    "date": "1 month ago",
+                    "summary": "Users can now invoke AI agents to summarize meetings, autofill project reports, and translate docs."
+                }
+            ],
+            "talking_points": [
+                "Notion's Sites launch indicates a focus on web deployment. Offer caching and SEO audit tooling integrations for Notion public pages.",
+                "Pitch automated integration tools that bridge third-party databases with Notion's core workspace dynamically.",
+                "Notion AI's expansion opens conversational API integrations; propose secure vector DB syncing pipelines."
+            ],
+            "sources": ["https://www.notion.so", "https://techcrunch.com", "https://www.theverge.com"]
+        },
+        "wave": {
+            "overview": "Wave is a fintech company offering mobile money services in Francophone Africa. It provides users with free deposits, withdrawals, and bill payments via a QR-code card and mobile app.",
+            "industry": "Fintech / Mobile Money",
+            "business_model": "B2C Financial Services",
+            "founded": "2018",
+            "headquarters": "Dakar, Senegal",
+            "headcount": "1001-5000 (estimated)",
+            "funding": {
+                "stage": "Series A",
+                "total_raised": "$200M",
+                "last_round": "$200M (September 2021)",
+                "investors": ["Stripe", "Founders Fund", "Ribbit Capital", "Sequoia Capital Heritage"]
+            },
+            "key_people": [
+                { "name": "Drew Durbin", "role": "CEO & Co-founder" },
+                { "name": "Lincoln Quirk", "role": "Co-founder" }
+            ],
+            "recent_news": [
+                {
+                    "title": "Fintech unicorn Wave expands mobile money services in Cote d'Ivoire",
+                    "url": "https://bloomberg.com/wave-Cote-d-Ivoire",
+                    "date": "3 weeks ago",
+                    "summary": "Wave reports high user adoption as it challenges incumbent telecom carriers with a zero-fee transaction model."
+                },
+                {
+                    "title": "Wave secures regulatory license to operate banking services",
+                    "url": "https://techcabal.com/wave-banking-license",
+                    "date": "2 months ago",
+                    "summary": "The central bank grants Wave authority to offer direct savings and credit services in Senegal."
+                }
+            ],
+            "talking_points": [
+                "Wave's expansion in Cote d'Ivoire highlights rapid user growth. Propose offline-capable transaction syncing protocols to bypass local connection dropouts.",
+                "With their new banking license, pitch secure KYC verification pipelines to onboard credit applicants fast.",
+                "Highlight how your transactional analytics suite can help Wave detect mobile money fraud patterns in real-time."
+            ],
+            "sources": ["https://www.wave.com", "https://www.bloomberg.com", "https://techcabal.com"]
+        },
+        "razorpay": {
+            "overview": "Razorpay is India's leading payment solutions company, providing businesses with a suite of developer-friendly APIs to accept, process, and disburse payments. The company has evolved from a payment gateway into a full-scale financial services platform.",
+            "industry": "Fintech / Financial Services",
+            "business_model": "B2B SaaS / Transaction Fee",
+            "founded": "2014",
+            "headquarters": "Bengaluru, Karnataka, India",
+            "headcount": "1001-5000 (estimated)",
+            "funding": {
+                "stage": "Series F",
+                "total_raised": "$741.5M",
+                "last_round": "$375M (Dec 2021)",
+                "investors": ["GIC", "Lone Pine Capital", "Tiger Global", "Sequoia Capital India"]
+            },
+            "key_people": [
+                { "name": "Harshil Mathur", "role": "CEO & Co-founder" },
+                { "name": "Shashank Kumar", "role": "CTO & Co-founder" }
+            ],
+            "recent_news": [
+                {
+                    "title": "Razorpay launches PayOut Links for B2B merchant operations",
+                    "url": "https://techcrunch.com/razorpay-payout-links",
+                    "date": "3 days ago",
+                    "summary": "The new service allows merchants to make bulk transfers and track payables through dynamic, automated web links."
+                },
+                {
+                    "title": "Fintech leader Razorpay expands merchant offerings in Southeast Asia",
+                    "url": "https://economictimes.indiatimes.com/razorpay-sea-expansion",
+                    "date": "1 week ago",
+                    "summary": "Razorpay is scaling operations in Southeast Asian markets, following the acquisition of Curlec in Malaysia."
+                }
+            ],
+            "talking_points": [
+                "Razorpay's expansion into Southeast Asia aligns with cross-border commerce growth; their local payment API integrations could be a major value add.",
+                "Having raised a Series F round co-led by GIC, Razorpay is well-capitalized and likely scaling its infrastructure. Focus outreach on scalability and enterprise-grade reliability.",
+                "The recently launched PayOut Links feature indicates a strong push into B2B payouts. Suggest how your product integrates with payout workflows to streamline their new offering."
+            ],
+            "sources": ["https://razorpay.com", "https://www.crunchbase.com", "https://techcrunch.com", "https://economictimes.indiatimes.com"]
+        }
+    }
+
+    # Find matching company mock details or use generic fallback
+    selected_mock = None
+    for key, val in mock_db.items():
+        if key in comp_lower or comp_lower in key:
+            selected_mock = val
+            comp = key.title()
+            break
+            
+    if not selected_mock:
+        # Generic fallback Early Stage SaaS template
+        comp_clean = comp.title()
+        domain_mock = comp.lower().replace(" ", "") + ".com"
+        selected_mock = {
+            "overview": f"{comp_clean} is a growing technology company focused on delivering software products and digital experiences. The firm leverages modern tools to serve clients across global markets.",
+            "industry": "Technology / Software",
+            "business_model": "B2B SaaS / Services",
+            "founded": "2020",
+            "headquarters": "San Francisco, California, USA",
+            "headcount": "101-500 (estimated)",
+            "funding": {
+                "stage": "Seed / Early Stage",
+                "total_raised": "$5.0M",
+                "last_round": "$5.0M Seed (2024)",
+                "investors": ["Angel Investors", "Early-stage VC fund"]
+            },
+            "key_people": [
+                { "name": f"Alex Rivers", "role": "CEO & Founder" }
+            ],
+            "recent_news": [
+                {
+                    "title": f"{comp_clean} announces launch of new developer tools suite",
+                    "url": f"https://techcrunch.com/{comp.lower()}-dev-tools",
+                    "date": "3 days ago",
+                    "summary": f"The company has released their next-gen APIs to accelerate client integration speed by up to 50%."
+                }
+            ],
+            "talking_points": [
+                f"{comp_clean}'s new developer tools suite indicates active feature shipping. Suggesting automated testing and CI/CD tools could align with their roadmap.",
+                f"As an early-stage startup, highlighting cost efficiency and developer speed can be a strong value driver for outreach.",
+                f"Highlight integration compatibility to show how they can layer your solution over their new APIs easily."
+            ],
+            "sources": [f"https://{domain_mock}", "https://techcrunch.com"]
+        }
+
+    # Extract mock fields
+    overview = selected_mock["overview"]
+    industry = selected_mock["industry"]
+    business_model = selected_mock["business_model"]
+    founded = selected_mock["founded"]
+    headquarters = selected_mock["headquarters"]
+    headcount = selected_mock["headcount"]
+    funding = selected_mock["funding"]
+    key_people = selected_mock["key_people"]
+    recent_news = selected_mock["recent_news"]
+    talking_points = selected_mock["talking_points"]
+    sources = selected_mock["sources"]
+
+    # Construct mock streaming events
+    domain_clean = comp.lower().replace(" ", "") + ".com"
     steps = [
         ("reason", f"Initializing research for company '{comp}'. Searching for general overview, headquarters, founding date, and founders."),
         ("action", "web_search", {"query": f"{comp} company overview founding year headquarters founders"}),
-        ("observation", "web_search", f"[1] {comp} - About Us\nURL: https://{comp.lower().replace(' ', '')}.com/about\nSnippet: Founded in 2014, {comp} is a leading technology company delivering state-of-the-art software solutions. HQ in Bengaluru, India.\n[2] Crunchbase Profile: {comp} founded 2014, HQ in India."),
+        ("observation", "web_search", f"[1] {comp} - About Us\nURL: https://{domain_clean}\nSnippet: Founded in {founded}, {comp} is a leading player in the {industry} sector. HQ in {headquarters}.\n[2] Crunchbase Profile: {comp} founded {founded}, HQ in {headquarters}."),
         
-        ("reason", "Retrieved basic founding info. Now searching for funding stage, total capital raised, and key investment leads."),
+        ("reason", f"Retrieved basic founding info. Now searching for funding stage, total capital raised, and key investment leads for {comp}."),
         ("action", "web_search", {"query": f"{comp} funding stage total raised investors Crunchbase"}),
-        ("observation", "web_search", f"[1] Crunchbase Funding: {comp} has raised a total of $741.5M in funding over 8 rounds. Latest round: Series F.\n[2] TechCrunch: {comp} raises Series F round co-led by GIC and Lone Pine Capital."),
+        ("observation", "web_search", f"[1] Crunchbase Funding: {comp} has raised a total of {funding['total_raised']} in funding. Latest round: {funding['stage']}.\n[2] News: {comp} funding updates detail key leads including {', '.join(funding['investors'][:2])}."),
         
-        ("reason", f"Funding details found ($741.5M total, Series F). Fetching the home page for {comp} to understand their core business model."),
-        ("action", "fetch_page", {"url": f"https://{comp.lower().replace(' ', '')}.com"}),
-        ("observation", "fetch_page", f"{comp} is India's leading fintech payment platform enabling merchants to accept, process, and disburse payments. Products include payment gateway, neobanking, billing APIs, and corporate cards. Trusted by over 10M+ businesses."),
+        ("reason", f"Funding details found ({funding['total_raised']} total, {funding['stage']}). Fetching the home page for {comp} to understand their core business model."),
+        ("action", "fetch_page", {"url": f"https://{domain_clean}"}),
+        ("observation", "fetch_page", f"{overview} Operations are categorized under {industry} with a {business_model} model. Primary stakeholders include key leaders: {', '.join([kp['name'] for kp in key_people])}."),
         
         ("reason", f"Now searching for recent news articles and press releases about {comp} within the last 90 days."),
         ("action", "web_search", {"query": f"{comp} recent news announcements 2026"}),
-        ("observation", "web_search", f"[1] TechCrunch: {comp} launches PayOut Links for B2B merchant operations.\n[2] Economic Times: {comp} announces expansion plans into Southeast Asian markets starting this quarter."),
+        ("observation", "web_search", f"[1] News: {recent_news[0]['title']}\nURL: {recent_news[0]['url']}\nSnippet: {recent_news[0]['summary']}"),
         
         ("reason", f"Research completed for {comp}. Synthesizing collected logs into a structured dossier...")
     ]
 
     for step in steps:
-        await asyncio.sleep(1.0)
+        await asyncio.sleep(0.5)
         if not queue:
             continue
         
@@ -425,57 +765,24 @@ async def run_mock_agent(company_name: str, queue: asyncio.Queue, start_time: fl
     dossier = {
         "company": comp,
         "researched_at": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
-        "overview": f"{comp} is India's leading payment solutions company, providing businesses with a suite of developer-friendly APIs to accept, process, and disburse payments. The company has evolved from a payment gateway into a full-scale financial services platform.",
-        "industry": "Fintech / Financial Services",
-        "business_model": "B2B SaaS / Transaction Fee",
-        "founded": "2014",
-        "headquarters": "Bengaluru, India",
-        "headcount": "1001-5000 (estimated)",
-        "funding": {
-            "stage": "Series F",
-            "total_raised": "$741.5M",
-            "last_round": "$375M (2021)",
-            "investors": ["GIC", "Lone Pine Capital", "Tiger Global", "Sequoia Capital India"]
-        },
-        "key_people": [
-            { "name": "Harshil Mathur", "role": "CEO & Co-founder" },
-            { "name": "Shashank Kumar", "role": "CTO & Co-founder" }
-        ],
-        "recent_news": [
-            {
-                "title": f"{comp} launches PayOut Links for B2B payments",
-                "url": f"https://techcrunch.com/2026/06/{comp.lower()}-payout-links",
-                "date": "3 days ago",
-                "summary": f"The new service allows merchants to make bulk transfers and track payables through dynamic, automated web links."
-            },
-            {
-                "title": f"Fintech leader {comp} expands merchant offerings in Southeast Asia",
-                "url": f"https://economictimes.com/{comp.lower()}-sea-expansion",
-                "date": "1 week ago",
-                "summary": f"{comp} is scaling operations in Southeast Asian markets, following the acquisition of Curlec in Malaysia."
-            }
-        ],
-        "talking_points": [
-            f"{comp}'s expansion into Southeast Asia aligns with cross-border commerce growth; their local payment API integrations could be a major value add.",
-            f"Having raised a Series F round co-led by GIC, {comp} is well-capitalized and likely scaling its infrastructure. Focus outreach on scalability and enterprise-grade reliability.",
-            f"The recently launched PayOut Links feature indicates a strong push into B2B payouts. Suggest how your product integrates with payout workflows to streamline their new offering."
-        ],
-        "sources": [
-            f"https://{comp.lower().replace(' ', '')}.com",
-            "https://www.crunchbase.com",
-            "https://techcrunch.com",
-            "https://economictimes.indiatimes.com"
-        ],
-        "agent_metadata": {
-            "iterations": 4,
-            "tool_calls": 4,
-            "duration_seconds": int(time.time() - start_time),
-            "model_used": "Mock ReAct Agent (API Key Bypass)"
-        }
+        "overview": overview,
+        "industry": industry,
+        "business_model": business_model,
+        "founded": founded,
+        "headquarters": headquarters,
+        "headcount": headcount,
+        "funding": funding,
+        "key_people": key_people,
+        "recent_news": recent_news,
+        "talking_points": talking_points,
+        "sources": sources
     }
 
-    await asyncio.sleep(1.0)
+    populate_agent_metadata(dossier, 4, 4, int(time.time() - start_time), "Mock ReAct Agent (API Key Bypass)", queue)
+
+    await asyncio.sleep(0.5)
     if queue:
         await queue.put({"type": "complete", "dossier": dossier})
 
     return dossier
+

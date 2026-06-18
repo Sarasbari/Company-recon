@@ -1,15 +1,20 @@
 import React, { useEffect, useRef } from 'react';
 
 export default function StreamLog({ steps }) {
-  const bottomRef = useRef(null);
+  const containerRef = useRef(null);
 
-  // Auto-scroll to the bottom of the log as new steps arrive
+  // Auto-scroll the container to the bottom as new steps arrive without page jitter
   useEffect(() => {
-    bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
+    if (containerRef.current) {
+      containerRef.current.scrollTop = containerRef.current.scrollHeight;
+    }
   }, [steps]);
 
   return (
-    <div className="font-mono text-xs space-y-4 max-h-[600px] overflow-y-auto border border-border-subtle bg-bg-surface p-4 rounded select-text">
+    <div 
+      ref={containerRef}
+      className="font-mono text-xs space-y-4 max-h-[600px] overflow-y-auto border border-border-subtle bg-bg-surface p-4 rounded select-text scroll-smooth"
+    >
       {steps.map((step, idx) => {
         if (step.type === 'reason') {
           return (
@@ -55,7 +60,6 @@ export default function StreamLog({ steps }) {
         </div>
       )}
       
-      <div ref={bottomRef} />
     </div>
   );
 }

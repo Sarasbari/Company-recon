@@ -1,7 +1,15 @@
-import React from 'react';
-import { Briefcase, MapPin, Calendar, Users, TrendingUp, Award, FileText, Globe, Clock, Zap } from 'lucide-react';
+import React, { useState } from 'react';
+import { Copy, Check, Briefcase, MapPin, Calendar, Users, TrendingUp, Award, FileText, Globe, Clock, Zap } from 'lucide-react';
 
 export default function DossierReport({ dossier, onResearchAgain }) {
+  const [copiedIndex, setCopiedIndex] = useState(null);
+
+  const handleCopy = (text, idx) => {
+    navigator.clipboard.writeText(text);
+    setCopiedIndex(idx);
+    setTimeout(() => setCopiedIndex(null), 2000);
+  };
+
   if (!dossier) return null;
 
   const {
@@ -152,9 +160,16 @@ export default function DossierReport({ dossier, onResearchAgain }) {
         <div className="space-y-3">
           {talking_points.length > 0 ? (
             talking_points.map((point, idx) => (
-              <div key={idx} className="bg-bg-elevated border border-border-subtle/80 hover:border-accent-amber/50 rounded p-4 text-sm font-sans text-text-primary leading-relaxed relative flex gap-3 transition-colors">
+              <div key={idx} className="bg-bg-elevated border border-border-subtle/80 hover:border-accent-amber/50 rounded p-4 text-sm font-sans text-text-primary leading-relaxed relative flex gap-3 transition-colors group">
                 <span className="text-accent-amber font-mono font-bold">{idx + 1}.</span>
-                <span>{point}</span>
+                <span className="flex-1 pr-8">{point}</span>
+                <button
+                  onClick={() => handleCopy(point, idx)}
+                  className="absolute right-3 top-3 text-text-secondary hover:text-accent-amber cursor-pointer p-1 rounded hover:bg-bg-primary transition-colors md:opacity-0 md:group-hover:opacity-100"
+                  title="Copy talking point"
+                >
+                  {copiedIndex === idx ? <Check size={14} className="text-accent-green" /> : <Copy size={14} />}
+                </button>
               </div>
             ))
           ) : (

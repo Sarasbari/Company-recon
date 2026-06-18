@@ -10,7 +10,7 @@ from typing import Optional, Dict
 from backend.api.jobs import create_job, get_job_queue
 from backend.api.middleware.auth import get_user_id
 from backend.agent.react_loop import run_agent
-from backend.db.supabase import save_dossier, update_dossier
+from backend.db.supabase import save_dossier, update_dossier, get_dossier_by_id_only
 
 router = APIRouter(prefix="/research", tags=["research"])
 
@@ -28,6 +28,15 @@ RATE_LIMIT_WINDOW = 3600  # 1 hour in seconds
 class ResearchRequest(BaseModel):
     company: str = Field(..., min_length=2, description="The name of the company to research.")
     website: Optional[str] = Field(None, description="Optional website URL hint.")
+
+async def cleanup_job_status_delayed(job_id: str, delay: int = 300):
+    """
+    Deletes the job from the in-memory status store after a delay to allow the client to read it,
+    preventing memory leaks.
+    """
+    await asyncio.sleep(delay)
+    if job_id in job_status_store:
+        del job_status_store[job_id]
 
 async def run_agent_background(company: str, job_id: str, queue: asyncio.Queue, user_id: Optional[str], db_dossier_id: Optional[str]):
     """
@@ -52,6 +61,11 @@ async def run_agent_background(company: str, job_id: str, queue: asyncio.Queue, 
             job_status_store[job_id] = {"status": "failed", "error": str(e)}
             if db_dossier_id:
                 await update_dossier(db_dossier_id, "failed")
+        finally:
+            from backend.api.jobs import delete_job_queue
+            delete_job_queue(job_id)
+            # Schedule a background task to clean up the in-memory status store after 5 minutes
+            asyncio.create_task(cleanup_job_status_delayed(job_id, delay=300))
 
 @router.post("")
 async def start_research(request: Request, payload: ResearchRequest, background_tasks: BackgroundTasks):
@@ -92,7 +106,7 @@ async def start_research(request: Request, payload: ResearchRequest, background_
     db_dossier_id = None
     if user_id:
         # Save record in Supabase / In-Memory history as pending
-        db_dossier_id = await save_dossier(user_id=user_id, company=company_name, status="pending")
+        db_dossier_id = await save_dossier(user_id=user_id, company=company_name, status="pending", dossier_id=job_id)
 
     # Start agent loop in background
     background_tasks.add_task(run_agent_background, company_name, job_id, queue, user_id, db_dossier_id)
@@ -140,8 +154,68 @@ async def stream_research(job_id: str):
 async def get_research_status(job_id: str):
     """
     Polls the current status of a research job.
+    Falls back to checking the persistent database if not found in the memory store.
     """
     status_info = job_status_store.get(job_id)
     if not status_info:
+        db_record = await get_dossier_by_id_only(job_id)
+        if db_record:
+            return {
+                "status": db_record.get("status"),
+                "dossier": db_record.get("dossier"),
+                "error": None
+            }
         raise HTTPException(status_code=404, detail="Research job not found")
     return status_info
+
+@router.get("/debug/{job_id}")
+async def get_job_debug(job_id: str, request: Request):
+    """
+    Gated endpoint to retrieve raw ReAct agent steps for a completed job.
+    Loads from in-memory cache or persistent database, and validates ownership/local dev access.
+    """
+    status_info = job_status_store.get(job_id)
+    dossier = None
+    db_record = None
+    error = None
+    status = None
+    
+    if status_info:
+        status = status_info.get("status")
+        dossier = status_info.get("dossier")
+        error = status_info.get("error")
+    else:
+        db_record = await get_dossier_by_id_only(job_id)
+        if db_record:
+            status = db_record.get("status")
+            dossier = db_record.get("dossier")
+            
+    if not dossier:
+        if status:
+            return {
+                "job_id": job_id,
+                "status": status,
+                "error": error,
+                "steps": []
+            }
+        raise HTTPException(status_code=404, detail="Job or dossier not found")
+        
+    # Gating and authorization check (whichever best suited for production)
+    user_id = await get_user_id(request)
+    dossier_user_id = db_record.get("user_id") if db_record else None
+    
+    # We consider it a local request if client is localhost
+    is_local = request.client and request.client.host in ("127.0.0.1", "localhost", "::1")
+    
+    # In production, if a user ID is bound to the record, the requester must own it
+    if dossier_user_id and dossier_user_id != user_id and not is_local:
+        raise HTTPException(status_code=403, detail="Access denied: You do not own this research dossier")
+        
+    metadata = dossier.get("agent_metadata", {})
+    return {
+        "job_id": job_id,
+        "company": dossier.get("company"),
+        "model_used": metadata.get("model_used"),
+        "duration_seconds": metadata.get("duration_seconds"),
+        "steps": metadata.get("steps", [])
+    }

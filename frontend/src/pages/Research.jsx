@@ -39,7 +39,7 @@ export default function Research() {
           setDossier(data.dossier);
           setStatus('complete');
           setToolCallsCount(data.dossier.agent_metadata?.tool_calls || 0);
-          setStreamCollapsed(true);
+          setStreamCollapsed(false);
         } else if (data.status === 'failed') {
           setStatus('failed');
           setError(data.error || 'Research execution failed.');
@@ -76,9 +76,10 @@ export default function Research() {
           } else if (data.type === 'complete') {
             setDossier(data.dossier);
             setStatus('complete');
-            setStreamCollapsed(true);
+            setStreamCollapsed(false);
             eventSource.close();
-          } else if (data.type === 'error') {
+          }
+ else if (data.type === 'error') {
             setError(data.message);
             setStatus('failed');
             eventSource.close();

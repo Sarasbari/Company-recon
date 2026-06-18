@@ -22,13 +22,14 @@ def get_supabase_client() -> Optional[Client]:
         print(f"Supabase client initialization failed: {str(e)}")
         return None
 
-async def save_dossier(user_id: str, company: str, status: str, dossier: Optional[dict] = None) -> str:
+async def save_dossier(user_id: str, company: str, status: str, dossier: Optional[dict] = None, dossier_id: Optional[str] = None) -> str:
     """
     Saves a dossier record. Falls back to in-memory store in Mock Mode.
     Returns the created dossier ID.
     """
     client = get_supabase_client()
-    dossier_id = str(uuid.uuid4())
+    if not dossier_id:
+        dossier_id = str(uuid.uuid4())
     now_iso = datetime.datetime.now(datetime.timezone.utc).isoformat()
     
     data = {
@@ -55,6 +56,23 @@ async def save_dossier(user_id: str, company: str, status: str, dossier: Optiona
         print(f"Supabase save failed: {str(e)}. Storing in-memory instead.")
         _mock_dossiers_db[dossier_id] = data
         return dossier_id
+
+async def get_dossier_by_id_only(dossier_id: str) -> Optional[dict]:
+    """
+    Retrieves a single dossier by ID without checking ownership (used for admin/debug endpoints).
+    """
+    client = get_supabase_client()
+    if not client or dossier_id in _mock_dossiers_db:
+        return _mock_dossiers_db.get(dossier_id)
+
+    try:
+        res = client.table("dossiers").select("*").eq("id", dossier_id).execute()
+        if res.data:
+            return res.data[0]
+        return None
+    except Exception as e:
+        print(f"Supabase fetch single by id failed: {str(e)}")
+        return _mock_dossiers_db.get(dossier_id)
 
 async def update_dossier(dossier_id: str, status: str, dossier: Optional[dict] = None) -> None:
     """

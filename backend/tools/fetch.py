@@ -3,6 +3,8 @@ import httpx
 from bs4 import BeautifulSoup
 from urllib.parse import urlparse
 
+BLOCKED_DOMAINS = ["linkedin.com", "crunchbase.com", "glassdoor.com"]
+
 async def fetch_page(url: str) -> str:
     """
     Fetch and extract readable text content from a URL.
@@ -13,8 +15,8 @@ async def fetch_page(url: str) -> str:
     domain = parsed_url.netloc.lower()
     
     # Check blocklist for scraping blocks
-    if "linkedin.com" in domain or "crunchbase.com" in domain:
-        return "Direct scraping blocked for this domain. Use search result snippets instead."
+    if any(blocked in domain for blocked in BLOCKED_DOMAINS):
+        return f"Scraping blocked for domain: {domain}. Direct crawling is prohibited on this domain to avoid bot blocks. Please rely on search snippets instead."
 
     api_key = os.getenv("TAVILY_API_KEY")
     if not api_key or api_key == "mock_key":
@@ -34,6 +36,7 @@ async def fetch_page(url: str) -> str:
         return f"Mock content for page at {url}. This domain represents information retrieved in Mock Mode."
 
     # Method 1: Try Tavily Extract API
+    tavily_error = None
     try:
         async with httpx.AsyncClient(timeout=10.0) as client:
             response = await client.post(
@@ -48,12 +51,15 @@ async def fetch_page(url: str) -> str:
                 results = data.get("results", [])
                 if results and results[0].get("raw_content"):
                     raw_content = results[0]["raw_content"]
-                    return raw_content[:4000]
-    except Exception:
-        # If Tavily Extract fails, proceed to fallback scrapers
-        pass
+                    if raw_content.strip():
+                        return raw_content[:4000]
+            else:
+                tavily_error = f"Tavily Extract API status {response.status_code}: {response.text}"
+    except Exception as e:
+        tavily_error = f"Tavily Extract failed: {str(e)}"
 
     # Method 2: Fallback with httpx and BeautifulSoup4
+    fallback_error = None
     try:
         headers = {
             "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
@@ -73,6 +79,12 @@ async def fetch_page(url: str) -> str:
             chunks = (phrase.strip() for line in lines for phrase in line.split("  "))
             clean_text = "\n".join(chunk for chunk in chunks if chunk)
             
-            return clean_text[:4000]  # Restrict response content size
+            if clean_text.strip():
+                return clean_text[:4000]  # Restrict response content size
+            else:
+                fallback_error = "Extracted page content was empty."
     except Exception as e:
-        return f"Error fetching page content: {str(e)}"
+        fallback_error = str(e)
+
+    # Both failed - return descriptive failure message
+    return f"Failed to fetch content from {url} after trying Tavily Extract and BeautifulSoup fallback. Tavily Error: {tavily_error}. Fallback Error: {fallback_error}."

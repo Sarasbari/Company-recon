@@ -50,30 +50,42 @@ async def web_search(query: str) -> str:
                 "---\n"
             )
 
-    try:
-        async with httpx.AsyncClient(timeout=10.0) as client:
-            response = await client.post(
-                "https://api.tavily.com/search",
-                json={
-                    "api_key": api_key,
-                    "query": query,
-                    "search_depth": "basic",
-                    "include_answer": False,
-                    "max_results": 5
-                }
-            )
-            response.raise_for_status()
-            data = response.json()
-            results = data.get("results", [])
-            if not results:
-                return "No search results found."
-            
-            output = []
-            for i, res in enumerate(results, 1):
-                title = res.get("title", "No Title")
-                url = res.get("url", "No URL")
-                snippet = res.get("content", "No content available.")
-                output.append(f"[{i}] {title}\nURL: {url}\nSnippet: {snippet}\n---")
-            return "\n".join(output)
-    except Exception as e:
-        return f"Error performing web search: {str(e)}"
+    import asyncio
+    attempts = 2
+    delay = 1.0
+
+    for attempt in range(attempts):
+        try:
+            async with httpx.AsyncClient(timeout=10.0) as client:
+                response = await client.post(
+                    "https://api.tavily.com/search",
+                    json={
+                        "api_key": api_key,
+                        "query": query,
+                        "search_depth": "basic",
+                        "include_answer": False,
+                        "max_results": 5
+                    }
+                )
+                
+                if response.status_code == 429:
+                    return "Error: Tavily Search API key quota exhausted. Please upgrade your Tavily plan or check your billing details."
+                    
+                response.raise_for_status()
+                data = response.json()
+                results = data.get("results", [])
+                if not results:
+                    return "No search results found."
+                
+                output = []
+                for i, res in enumerate(results, 1):
+                    title = res.get("title", "No Title")
+                    url = res.get("url", "No URL")
+                    snippet = res.get("content", "No content available.")
+                    output.append(f"[{i}] {title}\nURL: {url}\nSnippet: {snippet}\n---")
+                return "\n".join(output)
+        except Exception as e:
+            if attempt == attempts - 1:
+                return f"Error performing web search after {attempts} attempts: {str(e)}"
+            await asyncio.sleep(delay)
+            delay *= 2.0

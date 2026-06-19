@@ -40,3 +40,10 @@ dist-ssr/
 Thumbs.db
 ehthumbs.db
 Desktop.ini
+.agents
+
+# Explicitly ensure these project-essential files are never ignored and tracked
+DESIGN.md
+PRODUCT.md
+skills-lock.json
+.impeccable/

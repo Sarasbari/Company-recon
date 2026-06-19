@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../components/ClerkWrapper';
 
@@ -87,60 +87,61 @@ export default function Home() {
   };
 
   return (
-    <div className="flex flex-col items-center justify-center min-h-[calc(100vh-56px)] px-6">
-      <div className="w-full max-w-lg text-center space-y-8">
+    <div className="flex flex-col items-center justify-center min-h-[calc(100vh-56px)] px-6 bg-bg-primary">
+      <div className="w-full max-w-lg text-center space-y-10">
         {/* Title Block */}
-        <div className="space-y-2">
-          <h1 className="font-display font-bold text-4xl text-text-primary uppercase tracking-tight">
+        <div className="space-y-3 animate-fade-in-up">
+          <h1 className="font-display font-medium text-5xl md:text-6xl text-text-primary tracking-tight flex items-center justify-center gap-2">
             company-recon
+            <span className="w-3 h-3 rounded-full bg-primary inline-block animate-pulse"></span>
           </h1>
-          <p className="font-sans text-sm text-text-secondary">
-            Prospect intelligence, automated
+          <p className="font-sans text-sm text-text-secondary max-w-sm mx-auto">
+            Prospect intelligence, compiled in real-time.
           </p>
         </div>
 
         {/* Input Form */}
         <form 
           onSubmit={(e) => { e.preventDefault(); handleSubmit(); }}
-          className="space-y-3"
+          className="space-y-4 animate-fade-in-up [animation-delay:150ms] opacity-0 [animation-fill-mode:forwards]"
         >
           <div className="relative flex items-center">
             <input
               ref={inputRef}
               type="text"
-              placeholder="Company name (e.g. Razorpay)"
+              placeholder="Enter company name (e.g. Stripe)"
               value={query}
               onChange={(e) => {
                 setQuery(e.target.value);
                 if (e.target.value.trim()) setError('');
               }}
               disabled={loading}
-              className="w-full h-[52px] bg-bg-surface border border-border-subtle focus:border-accent-blue focus:outline-none rounded px-4 text-text-primary placeholder:text-text-muted font-sans text-base transition-colors"
+              className="w-full h-[54px] bg-bg-surface border border-border-subtle focus:border-primary focus:outline-none focus:ring-4 focus:ring-primary/8 rounded-xl px-5 text-text-primary placeholder:text-text-muted/70 font-sans text-base transition-all duration-300 shadow-sm"
             />
             <button
               type="submit"
               disabled={loading}
-              className="absolute right-2.5 h-[36px] px-4 bg-accent-blue hover:bg-accent-blue/90 disabled:bg-bg-elevated text-white text-xs font-mono font-semibold rounded transition-colors flex items-center justify-center cursor-pointer"
+              className="absolute right-2 h-[38px] px-5 bg-primary hover:bg-accent-sage text-bg-elevated hover:text-text-primary text-xs font-sans font-semibold rounded-lg transition-all duration-300 ease-[cubic-bezier(0.34,1.56,0.64,1)] hover:scale-[1.03] active:scale-[0.97] disabled:bg-bg-elevated disabled:text-text-muted flex items-center justify-center cursor-pointer shadow-sm"
             >
               {loading ? 'Starting...' : 'Research →'}
             </button>
           </div>
           {error && (
-            <p className="text-left text-xs font-mono text-accent-red pl-1">
+            <p className="text-left text-xs font-mono text-accent-red pl-2 animate-fade-in">
               {error}
             </p>
           )}
         </form>
 
         {/* Suggestion Chips */}
-        <div className="flex items-center justify-center gap-2 text-xs font-mono">
-          <span className="text-text-muted">TRY:</span>
+        <div className="flex flex-wrap items-center justify-center gap-2 text-xs font-sans animate-fade-in-up [animation-delay:300ms] opacity-0 [animation-fill-mode:forwards]">
+          <span className="text-text-muted font-mono uppercase tracking-wider text-[10px]">TRY:</span>
           {['Razorpay', 'Stripe', 'Zomato'].map((name) => (
             <button
               key={name}
               onClick={() => handleSuggestionClick(name)}
               disabled={loading}
-              className="text-text-secondary hover:text-accent-blue border border-border-subtle bg-bg-surface hover:bg-bg-elevated px-2 py-1 rounded transition-colors cursor-pointer"
+              className="text-text-secondary hover:text-text-primary border border-border-subtle bg-bg-surface hover:bg-bg-elevated px-3 py-1 rounded-full transition-all duration-300 ease-[cubic-bezier(0.34,1.56,0.64,1)] hover:scale-105 hover:translate-y-[-1px] active:scale-95 cursor-pointer shadow-sm"
             >
               {name}
             </button>
@@ -149,8 +150,8 @@ export default function Home() {
 
         {/* User Search Stat */}
         {isSignedIn && historyCount !== null && (
-          <div className="text-[11px] font-mono text-text-muted">
-            You've researched <span className="text-accent-green font-semibold">{historyCount}</span> companies in this workspace
+          <div className="text-[11px] font-mono text-text-muted animate-fade-in-up [animation-delay:450ms] opacity-0 [animation-fill-mode:forwards]">
+            You've compiled <span className="text-primary font-semibold border-b border-primary/20 pb-0.5">{historyCount} dossiers</span> in this workspace
           </div>
         )}
       </div>

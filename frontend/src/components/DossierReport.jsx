@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { Copy, Check, Briefcase, MapPin, Calendar, Users, TrendingUp, Award, FileText, Globe, Clock, Zap } from 'lucide-react';
+import { useState } from 'react';
+import { Copy, Check, Briefcase, Users, TrendingUp, Award, FileText, Globe, Clock, Zap } from 'lucide-react';
 
 export default function DossierReport({ dossier, onResearchAgain }) {
   const [copiedIndex, setCopiedIndex] = useState(null);
@@ -34,92 +34,92 @@ export default function DossierReport({ dossier, onResearchAgain }) {
   const fundingInvestors = funding.investors || [];
 
   return (
-    <div className="bg-bg-surface border border-border-subtle rounded animate-fade-in p-6 md:p-8 space-y-8 max-w-4xl mx-auto w-full">
+    <div className="bg-bg-elevated border border-border-subtle rounded-xl animate-fade-in p-6 md:p-8 space-y-8 max-w-4xl mx-auto w-full shadow-sm">
       {/* Header */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-border-subtle pb-6">
         <div>
-          <h1 className="font-display font-bold text-3xl md:text-4xl text-text-primary tracking-tight uppercase">
+          <h1 className="font-display font-semibold text-3xl md:text-4xl text-text-primary tracking-tight">
             {company}
           </h1>
-          <div className="flex flex-wrap items-center gap-x-3 gap-y-1 mt-2 text-xs md:text-sm text-text-secondary font-mono">
-            <span>{industry}</span>
-            <span>•</span>
+          <div className="flex flex-wrap items-center gap-x-3 gap-y-1 mt-2 text-xs md:text-sm text-text-secondary font-sans">
+            <span className="font-medium text-primary">{industry}</span>
+            <span className="text-text-muted">•</span>
             <span>{headquarters}</span>
-            <span>•</span>
+            <span className="text-text-muted">•</span>
             <span>Founded {founded}</span>
           </div>
         </div>
         {onResearchAgain && (
           <button
             onClick={onResearchAgain}
-            className="self-start md:self-center bg-bg-elevated hover:bg-border-subtle border border-border-subtle hover:border-accent-blue text-text-primary text-xs font-mono py-2 px-4 rounded transition-all cursor-pointer"
+            className="self-start md:self-center bg-bg-primary hover:bg-accent-sage/20 border border-border-subtle text-primary font-sans text-xs font-semibold py-2 px-4 rounded-lg transition-all duration-300 ease-[cubic-bezier(0.34,1.56,0.64,1)] hover:scale-[1.03] active:scale-[0.97] cursor-pointer shadow-xs"
           >
-            [ Research Again ]
+            Research Again
           </button>
         )}
       </div>
 
       {/* Overview */}
       <div className="space-y-3">
-        <h2 className="font-display text-sm font-semibold text-text-primary tracking-wider uppercase flex items-center gap-2">
-          <FileText size={16} className="text-accent-blue" />
-          OVERVIEW
+        <h2 className="font-display text-lg font-medium text-text-primary flex items-center gap-2">
+          <FileText size={18} className="text-primary" />
+          Overview
         </h2>
-        <p className="text-sm md:text-base text-text-secondary leading-relaxed font-sans">
+        <p className="text-sm md:text-base text-text-secondary leading-relaxed font-sans max-w-[75ch]">
           {overview || "No overview available."}
         </p>
       </div>
 
       {/* Details & Funding Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-8 border-t border-b border-border-subtle py-8">
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-8 border-t border-b border-border-subtle/80 py-8">
         {/* Company Details */}
         <div className="space-y-4">
-          <h3 className="font-display text-xs font-semibold text-text-primary tracking-wider uppercase flex items-center gap-2">
-            <Briefcase size={14} className="text-accent-blue" />
+          <h3 className="font-display text-base font-medium text-text-primary flex items-center gap-2">
+            <Briefcase size={16} className="text-primary" />
             Company Details
           </h3>
           <div className="space-y-3 text-sm font-sans">
-            <div className="flex justify-between border-b border-border-subtle/30 pb-1.5">
-              <span className="text-text-secondary">Business Model:</span>
-              <span className="text-text-primary font-medium">{business_model}</span>
+            <div className="flex justify-between border-b border-border-subtle/30 pb-2">
+              <span className="text-text-secondary font-medium">Business Model</span>
+              <span className="text-text-primary font-semibold text-right">{business_model}</span>
             </div>
-            <div className="flex justify-between border-b border-border-subtle/30 pb-1.5">
-              <span className="text-text-secondary">Headquarters:</span>
-              <span className="text-text-primary font-medium">{headquarters}</span>
+            <div className="flex justify-between border-b border-border-subtle/30 pb-2">
+              <span className="text-text-secondary font-medium">Headquarters</span>
+              <span className="text-text-primary font-semibold text-right">{headquarters}</span>
             </div>
-            <div className="flex justify-between border-b border-border-subtle/30 pb-1.5">
-              <span className="text-text-secondary">Headcount:</span>
-              <span className="text-text-primary font-medium">{headcount}</span>
+            <div className="flex justify-between border-b border-border-subtle/30 pb-2">
+              <span className="text-text-secondary font-medium">Headcount</span>
+              <span className="text-text-primary font-semibold text-right">{headcount}</span>
             </div>
-            <div className="flex justify-between border-b border-border-subtle/30 pb-1.5">
-              <span className="text-text-secondary">Founded Year:</span>
-              <span className="text-text-primary font-medium">{founded}</span>
+            <div className="flex justify-between border-b border-border-subtle/30 pb-2">
+              <span className="text-text-secondary font-medium">Founded Year</span>
+              <span className="text-text-primary font-semibold text-right">{founded}</span>
             </div>
           </div>
         </div>
 
         {/* Funding Info */}
         <div className="space-y-4">
-          <h3 className="font-display text-xs font-semibold text-text-primary tracking-wider uppercase flex items-center gap-2">
-            <TrendingUp size={14} className="text-accent-blue" />
+          <h3 className="font-display text-base font-medium text-text-primary flex items-center gap-2">
+            <TrendingUp size={16} className="text-primary" />
             Funding Profile
           </h3>
           <div className="space-y-3 text-sm font-sans">
-            <div className="flex justify-between border-b border-border-subtle/30 pb-1.5">
-              <span className="text-text-secondary">Current Stage:</span>
-              <span className="text-text-primary font-medium">{fundingStage}</span>
+            <div className="flex justify-between border-b border-border-subtle/30 pb-2">
+              <span className="text-text-secondary font-medium">Current Stage</span>
+              <span className="text-text-primary font-semibold text-right">{fundingStage}</span>
             </div>
-            <div className="flex justify-between border-b border-border-subtle/30 pb-1.5">
-              <span className="text-text-secondary">Total Raised:</span>
-              <span className="text-text-primary font-medium text-accent-green font-mono">{fundingTotal}</span>
+            <div className="flex justify-between border-b border-border-subtle/30 pb-2">
+              <span className="text-text-secondary font-medium">Total Raised</span>
+              <span className="text-primary font-semibold font-mono text-right">{fundingTotal}</span>
             </div>
-            <div className="flex justify-between border-b border-border-subtle/30 pb-1.5">
-              <span className="text-text-secondary">Last Round:</span>
-              <span className="text-text-primary font-medium">{fundingLast}</span>
+            <div className="flex justify-between border-b border-border-subtle/30 pb-2">
+              <span className="text-text-secondary font-medium">Last Round</span>
+              <span className="text-text-primary font-semibold text-right">{fundingLast}</span>
             </div>
-            <div className="flex flex-col border-b border-border-subtle/30 pb-1.5">
-              <span className="text-text-secondary mb-1">Key Investors:</span>
-              <span className="text-text-primary font-medium">
+            <div className="flex flex-col border-b border-border-subtle/30 pb-2">
+              <span className="text-text-secondary font-medium mb-1">Key Investors</span>
+              <span className="text-text-primary font-semibold text-xs leading-normal">
                 {fundingInvestors.length > 0 ? fundingInvestors.join(', ') : 'None identified'}
               </span>
             </div>
@@ -129,14 +129,17 @@ export default function DossierReport({ dossier, onResearchAgain }) {
 
       {/* Key People */}
       <div className="space-y-4">
-        <h2 className="font-display text-sm font-semibold text-text-primary tracking-wider uppercase flex items-center gap-2">
-          <Users size={16} className="text-accent-blue" />
-          KEY PEOPLE
+        <h2 className="font-display text-lg font-medium text-text-primary flex items-center gap-2">
+          <Users size={18} className="text-primary" />
+          Key People
         </h2>
         {key_people.length > 0 ? (
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
             {key_people.map((person, idx) => (
-              <div key={idx} className="bg-bg-elevated border border-border-subtle rounded p-3 text-center">
+              <div
+                key={idx}
+                className="bg-bg-primary/50 border border-border-subtle/80 rounded-xl p-3.5 text-center transition-all duration-300 hover:border-primary/50 hover:bg-bg-elevated hover:shadow-xs"
+              >
                 <div className="font-sans font-semibold text-sm text-text-primary truncate">
                   {person.name}
                 </div>
@@ -152,23 +155,30 @@ export default function DossierReport({ dossier, onResearchAgain }) {
       </div>
 
       {/* Talking Points (Hero Output) */}
-      <div className="space-y-4 bg-bg-elevated/40 border border-accent-amber/30 rounded p-6">
-        <h2 className="font-display text-sm font-semibold text-accent-amber tracking-wider uppercase flex items-center gap-2">
-          <Award size={18} />
-          TALKING POINTS
+      <div className="space-y-4 bg-accent-amber/5 border border-accent-amber/30 rounded-xl p-6 md:p-8">
+        <h2 className="font-display text-xl font-medium text-accent-amber flex items-center gap-2">
+          <Award size={20} className="text-accent-amber" />
+          Talking Points
         </h2>
         <div className="space-y-3">
           {talking_points.length > 0 ? (
             talking_points.map((point, idx) => (
-              <div key={idx} className="bg-bg-elevated border border-border-subtle/80 hover:border-accent-amber/50 rounded p-4 text-sm font-sans text-text-primary leading-relaxed relative flex gap-3 transition-colors group">
+              <div
+                key={idx}
+                className="bg-bg-elevated border border-border-subtle/80 hover:border-accent-amber/40 rounded-xl p-4 text-sm font-sans text-text-primary leading-relaxed relative flex gap-3 transition-all duration-300 hover:-translate-y-[1px] hover:shadow-xs group"
+              >
                 <span className="text-accent-amber font-mono font-bold">{idx + 1}.</span>
                 <span className="flex-1 pr-8">{point}</span>
                 <button
                   onClick={() => handleCopy(point, idx)}
-                  className="absolute right-3 top-3 text-text-secondary hover:text-accent-amber cursor-pointer p-1 rounded hover:bg-bg-primary transition-colors md:opacity-0 md:group-hover:opacity-100"
+                  className="absolute right-3 top-3 text-text-secondary hover:text-accent-amber cursor-pointer p-1 rounded-lg hover:bg-bg-primary transition-all duration-200 md:opacity-0 md:group-hover:opacity-100"
                   title="Copy talking point"
                 >
-                  {copiedIndex === idx ? <Check size={14} className="text-accent-green" /> : <Copy size={14} />}
+                  {copiedIndex === idx ? (
+                    <Check size={14} className="text-accent-green" />
+                  ) : (
+                    <Copy size={14} />
+                  )}
                 </button>
               </div>
             ))
@@ -179,29 +189,35 @@ export default function DossierReport({ dossier, onResearchAgain }) {
       </div>
 
       {/* Recent News */}
-      <div className="space-y-4">
-        <h2 className="font-display text-sm font-semibold text-text-primary tracking-wider uppercase flex items-center gap-2">
-          <TrendingUp size={16} className="text-accent-blue" />
-          RECENT NEWS (LAST 90 DAYS)
+      <div className="space-y-5">
+        <h2 className="font-display text-lg font-medium text-text-primary flex items-center gap-2">
+          <TrendingUp size={18} className="text-primary" />
+          Recent News (Last 90 Days)
         </h2>
         {recent_news.length > 0 ? (
-          <div className="space-y-4">
+          <div className="space-y-5">
             {recent_news.map((item, idx) => (
-              <div key={idx} className="border-l-2 border-border-subtle hover:border-accent-blue pl-4 py-1 space-y-1 transition-all">
+              <div
+                key={idx}
+                className="relative pl-6 border-l border-border-subtle hover:border-primary py-1 space-y-1.5 transition-all duration-300 group"
+              >
+                {/* Visual timeline bullet */}
+                <div className="absolute left-[-4.5px] top-[10px] w-2 h-2 rounded-full bg-border-subtle group-hover:bg-primary transition-colors duration-300" />
+                
                 <div className="flex items-center gap-2">
                   <a
                     href={item.url}
                     target="_blank"
                     rel="noreferrer"
-                    className="font-sans font-semibold text-sm text-text-primary hover:text-accent-blue hover:underline transition-all"
+                    className="font-sans font-semibold text-sm text-text-primary hover:text-primary hover:underline transition-all block"
                   >
                     {item.title}
                   </a>
                 </div>
-                <div className="flex items-center gap-2 text-[11px] text-text-secondary font-mono">
-                  <span>{item.date}</span>
+                <div className="text-[11px] text-text-muted font-mono">
+                  {item.date}
                 </div>
-                <p className="font-sans text-xs text-text-secondary leading-relaxed">
+                <p className="font-sans text-xs text-text-secondary leading-relaxed max-w-[75ch]">
                   {item.summary}
                 </p>
               </div>
@@ -213,29 +229,38 @@ export default function DossierReport({ dossier, onResearchAgain }) {
       </div>
 
       {/* Sources & Footer Metadata */}
-      <div className="border-t border-border-subtle pt-6 flex flex-col md:flex-row justify-between items-start md:items-center gap-4 text-xs font-mono text-text-muted">
-        <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
+      <div className="border-t border-border-subtle pt-6 flex flex-col md:flex-row justify-between items-start md:items-center gap-4 text-xs text-text-secondary">
+        <div className="flex flex-wrap items-center gap-x-2 gap-y-1 font-sans">
           <Globe size={12} className="text-text-muted" />
-          <span className="text-text-secondary">SOURCES:</span>
+          <span className="font-medium text-text-primary uppercase tracking-wider text-[10px]">Sources:</span>
           {sources.length > 0 ? (
             sources.map((src, idx) => {
               let display = src;
-              try { display = new URL(src).hostname; } catch(e){}
+              try {
+                display = new URL(src).hostname;
+              } catch {
+                // Use original string if URL parsing fails
+              }
               return (
                 <span key={idx} className="flex items-center">
-                  <a href={src} target="_blank" rel="noreferrer" className="text-text-secondary hover:text-accent-blue underline">
+                  <a
+                    href={src}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="text-text-secondary hover:text-primary underline decoration-border-subtle hover:decoration-primary transition-colors"
+                  >
                     {display}
                   </a>
-                  {idx < sources.length - 1 && <span className="ml-2 text-text-muted">·</span>}
+                  {idx < sources.length - 1 && <span className="ml-2 text-text-muted">•</span>}
                 </span>
               );
             })
           ) : (
-            <span>None recorded</span>
+            <span className="text-text-muted italic">None recorded</span>
           )}
         </div>
-        
-        <div className="flex items-center gap-3 text-[11px] text-right self-stretch md:self-auto border-t md:border-t-0 border-border-subtle/30 pt-3 md:pt-0">
+
+        <div className="flex items-center gap-3 text-[11px] font-mono text-text-muted self-stretch md:self-auto border-t md:border-t-0 border-border-subtle/30 pt-3 md:pt-0">
           <span className="flex items-center gap-1">
             <Clock size={10} />
             {agent_metadata.duration_seconds || 0}s

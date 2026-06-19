@@ -1,9 +1,12 @@
 import sys
 import os
 import asyncio
+from dotenv import load_dotenv
 
 # Ensure backend folder is in path for imports
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "../..")))
+
+load_dotenv()
 
 from backend.agent.react_loop import run_agent
 

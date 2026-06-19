@@ -2,6 +2,7 @@ import os
 import json
 import time
 import asyncio
+import httpx
 from anthropic import AsyncAnthropic
 from backend.agent.prompts import build_system_prompt, SYNTHESIS_PROMPT
 from backend.tools.dispatcher import dispatch_tool
@@ -256,6 +257,93 @@ async def _run_agent_internal(company_name: str, queue: asyncio.Queue = None) ->
             await queue.put({"type": "error", "message": error_msg})
         raise e
 
+LAST_GEMINI_REQUEST_TIME = 0.0
+GEMINI_MIN_INTERVAL = 4.1  # 4.1s to be safe under the 15 RPM limit
+
+async def gemini_post_with_retry(client, url, json_payload, queue=None, max_retries=6, initial_delay=5.0, backoff_factor=2.0):
+    global LAST_GEMINI_REQUEST_TIME
+    delay = initial_delay
+    for attempt in range(max_retries):
+        # Enforce minimum interval between requests proactively
+        now = time.time()
+        elapsed = now - LAST_GEMINI_REQUEST_TIME
+        if elapsed < GEMINI_MIN_INTERVAL:
+            sleep_time = GEMINI_MIN_INTERVAL - elapsed
+            await asyncio.sleep(sleep_time)
+            
+        LAST_GEMINI_REQUEST_TIME = time.time()
+        try:
+            response = await client.post(url, json=json_payload)
+            if response.status_code == 429:
+                retry_after_str = response.headers.get("retry-after")
+                try:
+                    retry_delay = float(retry_after_str) if retry_after_str else delay
+                except ValueError:
+                    retry_delay = delay
+                
+                if queue:
+                    await queue.put({
+                        "type": "reason",
+                        "text": f"Gemini API rate limit (429) hit. Retrying attempt {attempt + 1}/{max_retries} in {retry_delay:.1f}s..."
+                    })
+                await asyncio.sleep(retry_delay)
+                LAST_GEMINI_REQUEST_TIME = time.time()
+                delay *= backoff_factor
+                continue
+            
+            response.raise_for_status()
+            return response.json()
+        except httpx.HTTPStatusError as e:
+            status_code = e.response.status_code
+            if status_code == 429:
+                retry_after_str = e.response.headers.get("retry-after")
+                try:
+                    retry_delay = float(retry_after_str) if retry_after_str else delay
+                except ValueError:
+                    retry_delay = delay
+                if queue:
+                    await queue.put({
+                        "type": "reason",
+                        "text": f"Gemini API rate limit (429) hit. Retrying attempt {attempt + 1}/{max_retries} in {retry_delay:.1f}s..."
+                    })
+                await asyncio.sleep(retry_delay)
+                LAST_GEMINI_REQUEST_TIME = time.time()
+                delay *= backoff_factor
+                continue
+            elif status_code in (500, 502, 503, 504) and attempt < max_retries - 1:
+                if queue:
+                    await queue.put({
+                        "type": "reason",
+                        "text": f"Gemini API transient error ({status_code}). Retrying in {delay:.1f}s..."
+                    })
+                await asyncio.sleep(delay)
+                LAST_GEMINI_REQUEST_TIME = time.time()
+                delay *= backoff_factor
+                continue
+            raise e
+        except (httpx.RequestError, asyncio.TimeoutError) as e:
+            if attempt < max_retries - 1:
+                if queue:
+                    await queue.put({
+                        "type": "reason",
+                        "text": f"Gemini API network/timeout error. Retrying in {delay:.1f}s..."
+                    })
+                await asyncio.sleep(delay)
+                LAST_GEMINI_REQUEST_TIME = time.time()
+                delay *= backoff_factor
+                continue
+            raise e
+            
+    # Final attempt
+    now = time.time()
+    elapsed = now - LAST_GEMINI_REQUEST_TIME
+    if elapsed < GEMINI_MIN_INTERVAL:
+        await asyncio.sleep(GEMINI_MIN_INTERVAL - elapsed)
+    LAST_GEMINI_REQUEST_TIME = time.time()
+    response = await client.post(url, json=json_payload)
+    response.raise_for_status()
+    return response.json()
+
 async def run_gemini_agent(company_name: str, queue: asyncio.Queue = None, start_time: float = None) -> dict:
     """
     Runs the ReAct loop using the free Google Gemini API.
@@ -302,7 +390,6 @@ async def run_gemini_agent(company_name: str, queue: asyncio.Queue = None, start
     tool_calls_count = 0
     sources_visited = set()
 
-    import httpx
     async with httpx.AsyncClient(timeout=30.0) as client:
         while iteration < MAX_ITERATIONS:
             payload = {
@@ -319,9 +406,7 @@ async def run_gemini_agent(company_name: str, queue: asyncio.Queue = None, start
                     "parts": [{"text": f"Start researching {company_name}."}]
                 })
             
-            response = await client.post(url, json=payload)
-            response.raise_for_status()
-            res_data = response.json()
+            res_data = await gemini_post_with_retry(client, url, payload, queue)
             
             candidates = res_data.get("candidates", [])
             if not candidates:
@@ -405,9 +490,7 @@ async def run_gemini_agent(company_name: str, queue: asyncio.Queue = None, start
             }
         }
         
-        synth_res = await client.post(url, json=synthesis_payload)
-        synth_res.raise_for_status()
-        synth_data = synth_res.json()
+        synth_data = await gemini_post_with_retry(client, url, synthesis_payload, queue)
         
         dossier_text = synth_data["candidates"][0]["content"]["parts"][0]["text"]
         

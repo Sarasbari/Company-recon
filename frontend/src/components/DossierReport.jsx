@@ -34,9 +34,12 @@ export default function DossierReport({ dossier, onResearchAgain }) {
   const fundingInvestors = funding.investors || [];
 
   return (
-    <div className="bg-bg-elevated border border-border-subtle rounded-xl animate-fade-in p-6 md:p-8 space-y-8 max-w-4xl mx-auto w-full shadow-sm">
+    <div className="bg-bg-elevated border border-border-subtle rounded-xl p-6 md:p-8 space-y-8 max-w-4xl mx-auto w-full shadow-sm">
       {/* Header */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-border-subtle pb-6">
+      <div 
+        className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-border-subtle pb-6 animate-fade-in opacity-0"
+        style={{ animationDelay: '0ms' }}
+      >
         <div>
           <h1 className="font-display font-semibold text-3xl md:text-4xl text-text-primary tracking-tight">
             {company}
@@ -52,7 +55,7 @@ export default function DossierReport({ dossier, onResearchAgain }) {
         {onResearchAgain && (
           <button
             onClick={onResearchAgain}
-            className="self-start md:self-center bg-bg-primary hover:bg-accent-sage/20 border border-border-subtle text-primary font-sans text-xs font-semibold py-2 px-4 rounded-lg transition-all duration-300 ease-[cubic-bezier(0.34,1.56,0.64,1)] hover:scale-[1.03] active:scale-[0.97] cursor-pointer shadow-xs"
+            className="self-start md:self-center bg-bg-primary hover:bg-accent-sage/20 border border-border-subtle text-primary font-sans text-xs font-semibold py-2 px-4 rounded-lg transition-all duration-150 ease-out active:scale-[0.97] cursor-pointer shadow-xs"
           >
             Research Again
           </button>
@@ -60,7 +63,10 @@ export default function DossierReport({ dossier, onResearchAgain }) {
       </div>
 
       {/* Overview */}
-      <div className="space-y-3">
+      <div 
+        className="space-y-3 animate-fade-in opacity-0"
+        style={{ animationDelay: '50ms' }}
+      >
         <h2 className="font-display text-lg font-medium text-text-primary flex items-center gap-2">
           <FileText size={18} className="text-primary" />
           Overview
@@ -71,7 +77,10 @@ export default function DossierReport({ dossier, onResearchAgain }) {
       </div>
 
       {/* Details & Funding Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-8 border-t border-b border-border-subtle/80 py-8">
+      <div 
+        className="grid grid-cols-1 md:grid-cols-2 gap-8 border-t border-b border-border-subtle/80 py-8 animate-fade-in opacity-0"
+        style={{ animationDelay: '100ms' }}
+      >
         {/* Company Details */}
         <div className="space-y-4">
           <h3 className="font-display text-base font-medium text-text-primary flex items-center gap-2">
@@ -128,7 +137,10 @@ export default function DossierReport({ dossier, onResearchAgain }) {
       </div>
 
       {/* Key People */}
-      <div className="space-y-4">
+      <div 
+        className="space-y-4 animate-fade-in opacity-0"
+        style={{ animationDelay: '150ms' }}
+      >
         <h2 className="font-display text-lg font-medium text-text-primary flex items-center gap-2">
           <Users size={18} className="text-primary" />
           Key People
@@ -138,7 +150,7 @@ export default function DossierReport({ dossier, onResearchAgain }) {
             {key_people.map((person, idx) => (
               <div
                 key={idx}
-                className="bg-bg-primary/50 border border-border-subtle/80 rounded-xl p-3.5 text-center transition-all duration-300 hover:border-primary/50 hover:bg-bg-elevated hover:shadow-xs"
+                className="bg-bg-primary/50 border border-border-subtle/80 rounded-xl p-3.5 text-center transition-colors duration-200 hover:border-primary/50 hover:bg-bg-elevated hover:shadow-xs"
               >
                 <div className="font-sans font-semibold text-sm text-text-primary truncate">
                   {person.name}
@@ -155,7 +167,10 @@ export default function DossierReport({ dossier, onResearchAgain }) {
       </div>
 
       {/* Talking Points (Hero Output) */}
-      <div className="space-y-4 bg-accent-amber/5 border border-accent-amber/30 rounded-xl p-6 md:p-8">
+      <div 
+        className="space-y-4 bg-accent-amber/5 border border-accent-amber/30 rounded-xl p-6 md:p-8 animate-fade-in opacity-0"
+        style={{ animationDelay: '200ms' }}
+      >
         <h2 className="font-display text-xl font-medium text-accent-amber flex items-center gap-2">
           <Award size={20} className="text-accent-amber" />
           Talking Points
@@ -165,7 +180,7 @@ export default function DossierReport({ dossier, onResearchAgain }) {
             talking_points.map((point, idx) => (
               <div
                 key={idx}
-                className="bg-bg-elevated border border-border-subtle/80 hover:border-accent-amber/40 rounded-xl p-4 text-sm font-sans text-text-primary leading-relaxed relative flex gap-3 transition-all duration-300 hover:-translate-y-[1px] hover:shadow-xs group"
+                className="bg-bg-elevated border border-border-subtle/80 hover:border-accent-amber/40 rounded-xl p-4 text-sm font-sans text-text-primary leading-relaxed relative flex gap-3 transition-colors duration-200 hover:shadow-xs group"
               >
                 <span className="text-accent-amber font-mono font-bold">{idx + 1}.</span>
                 <span className="flex-1 pr-8">{point}</span>
@@ -189,7 +204,10 @@ export default function DossierReport({ dossier, onResearchAgain }) {
       </div>
 
       {/* Recent News */}
-      <div className="space-y-5">
+      <div 
+        className="space-y-5 animate-fade-in opacity-0"
+        style={{ animationDelay: '250ms' }}
+      >
         <h2 className="font-display text-lg font-medium text-text-primary flex items-center gap-2">
           <TrendingUp size={18} className="text-primary" />
           Recent News (Last 90 Days)
@@ -199,17 +217,17 @@ export default function DossierReport({ dossier, onResearchAgain }) {
             {recent_news.map((item, idx) => (
               <div
                 key={idx}
-                className="relative pl-6 border-l border-border-subtle hover:border-primary py-1 space-y-1.5 transition-all duration-300 group"
+                className="relative pl-6 border-l border-border-subtle hover:border-primary py-1 space-y-1.5 transition-colors duration-200 group"
               >
                 {/* Visual timeline bullet */}
-                <div className="absolute left-[-4.5px] top-[10px] w-2 h-2 rounded-full bg-border-subtle group-hover:bg-primary transition-colors duration-300" />
+                <div className="absolute left-[-4.5px] top-[10px] w-2 h-2 rounded-full bg-border-subtle group-hover:bg-primary transition-colors duration-200" />
                 
                 <div className="flex items-center gap-2">
                   <a
                     href={item.url}
                     target="_blank"
                     rel="noreferrer"
-                    className="font-sans font-semibold text-sm text-text-primary hover:text-primary hover:underline transition-all block"
+                    className="font-sans font-semibold text-sm text-text-primary hover:text-primary hover:underline transition-colors duration-150 block"
                   >
                     {item.title}
                   </a>
@@ -229,7 +247,10 @@ export default function DossierReport({ dossier, onResearchAgain }) {
       </div>
 
       {/* Sources & Footer Metadata */}
-      <div className="border-t border-border-subtle pt-6 flex flex-col md:flex-row justify-between items-start md:items-center gap-4 text-xs text-text-secondary">
+      <div 
+        className="border-t border-border-subtle pt-6 flex flex-col md:flex-row justify-between items-start md:items-center gap-4 text-xs text-text-secondary animate-fade-in opacity-0"
+        style={{ animationDelay: '300ms' }}
+      >
         <div className="flex flex-wrap items-center gap-x-2 gap-y-1 font-sans">
           <Globe size={12} className="text-text-muted" />
           <span className="font-medium text-text-primary uppercase tracking-wider text-[10px]">Sources:</span>

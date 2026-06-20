@@ -91,7 +91,7 @@ export default function DossierDetail() {
         <p className="text-sm text-text-secondary leading-relaxed font-sans">{error}</p>
         <Link 
           to="/history"
-          className="inline-block bg-primary hover:bg-accent-sage text-bg-elevated hover:text-text-primary text-xs font-sans font-semibold py-2 px-4 rounded-lg transition-all duration-300 ease-[cubic-bezier(0.34,1.56,0.64,1)] hover:scale-[1.02] active:scale-[0.98]"
+          className="inline-block bg-primary hover:bg-accent-sage text-bg-elevated hover:text-text-primary text-xs font-sans font-semibold py-2 px-4 rounded-lg transition-all duration-150 ease-out active:scale-[0.98]"
         >
           Back to History
         </Link>
@@ -147,7 +147,7 @@ export default function DossierDetail() {
               </button>
               <button
                 onClick={handleDelete}
-                className="bg-accent-red hover:bg-accent-red/90 text-white font-semibold py-2 px-4 rounded-lg transition-all duration-300 ease-[cubic-bezier(0.34,1.56,0.64,1)] hover:scale-[1.03] active:scale-[0.97] cursor-pointer"
+                className="bg-accent-red hover:bg-accent-red/90 text-white font-semibold py-2 px-4 rounded-lg transition-all duration-150 ease-out active:scale-[0.97] cursor-pointer"
               >
                 Delete
               </button>

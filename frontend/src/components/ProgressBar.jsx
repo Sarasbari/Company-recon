@@ -9,7 +9,7 @@ export default function ProgressBar({ count, max = 12 }) {
       </div>
       <div className="h-2 bg-bg-primary rounded-full overflow-hidden border border-border-subtle/50">
         <div 
-          className="h-full bg-primary transition-all duration-500 ease-[cubic-bezier(0.34,1.56,0.64,1)] rounded-full" 
+          className="h-full bg-primary transition-all duration-500 ease-out rounded-full" 
           style={{ width: `${percentage}%` }}
         />
       </div>

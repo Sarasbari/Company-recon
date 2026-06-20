@@ -83,7 +83,7 @@ export default function History() {
         </h1>
         <Link 
           to="/"
-          className="bg-primary hover:bg-accent-sage text-bg-elevated hover:text-text-primary font-sans text-xs font-semibold py-2 px-4 rounded-lg flex items-center gap-1.5 transition-all duration-300 ease-[cubic-bezier(0.34,1.56,0.64,1)] hover:scale-[1.03] active:scale-[0.97] cursor-pointer shadow-sm"
+          className="bg-primary hover:bg-accent-sage text-bg-elevated hover:text-text-primary font-sans text-xs font-semibold py-2 px-4 rounded-lg flex items-center gap-1.5 transition-all duration-150 ease-out active:scale-[0.97] cursor-pointer shadow-sm"
         >
           <Plus size={14} />
           New Research
@@ -96,7 +96,7 @@ export default function History() {
           <p className="font-sans text-sm text-text-secondary">No dossiers stored. Begin a company research session to save them.</p>
           <Link
             to="/"
-            className="inline-block bg-bg-elevated border border-border-subtle hover:border-primary text-text-primary text-xs font-sans font-semibold py-2 px-4 rounded-lg transition-all duration-300 ease-[cubic-bezier(0.34,1.56,0.64,1)] hover:scale-[1.02] active:scale-[0.98]"
+            className="inline-block bg-bg-elevated border border-border-subtle hover:border-primary text-text-primary text-xs font-sans font-semibold py-2 px-4 rounded-lg transition-all duration-150 ease-out active:scale-[0.98]"
           >
             Start Search
           </Link>
@@ -119,7 +119,7 @@ export default function History() {
             return (
               <div 
                 key={item.id}
-                className="relative bg-bg-surface border border-border-subtle hover:border-primary/30 rounded-xl p-5 flex flex-col md:flex-row md:items-center justify-between gap-4 transition-all duration-300 shadow-sm hover:shadow-md hover:translate-y-[-2px]"
+                className="relative bg-bg-surface border border-border-subtle hover:border-primary/30 rounded-xl p-5 flex flex-col md:flex-row md:items-center justify-between gap-4 transition-all duration-150 shadow-sm"
                 onMouseEnter={() => setHoveredOverview(item.id)}
                 onMouseLeave={() => setHoveredOverview(null)}
               >
@@ -194,7 +194,7 @@ export default function History() {
               </button>
               <button
                 onClick={handleDeleteConfirm}
-                className="bg-accent-red hover:bg-accent-red/90 text-white font-semibold py-2 px-4 rounded-lg transition-all duration-300 ease-[cubic-bezier(0.34,1.56,0.64,1)] hover:scale-[1.03] active:scale-[0.97] cursor-pointer"
+                className="bg-accent-red hover:bg-accent-red/90 text-white font-semibold py-2 px-4 rounded-lg transition-all duration-150 ease-out active:scale-[0.97] cursor-pointer"
               >
                 Delete
               </button>

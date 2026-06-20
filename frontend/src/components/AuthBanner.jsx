@@ -18,7 +18,7 @@ export default function AuthBanner() {
       </div>
       <div className="flex items-center gap-3">
         <SignInButton mode="modal">
-          <button className="bg-primary hover:bg-accent-sage hover:text-text-primary text-bg-elevated font-sans text-xs font-semibold py-1.5 px-3.5 rounded-md transition-all duration-300 ease-[cubic-bezier(0.34,1.56,0.64,1)] hover:scale-[1.03] active:scale-[0.97] cursor-pointer">
+          <button className="bg-primary hover:bg-accent-sage hover:text-text-primary text-bg-elevated font-sans text-xs font-semibold py-1.5 px-3.5 rounded-md transition-all duration-150 ease-out active:scale-[0.97] cursor-pointer">
             Sign In
           </button>
         </SignInButton>

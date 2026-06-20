@@ -121,7 +121,7 @@ export default function Home() {
             <button
               type="submit"
               disabled={loading}
-              className="absolute right-2 h-[38px] px-5 bg-primary hover:bg-accent-sage text-bg-elevated hover:text-text-primary text-xs font-sans font-semibold rounded-lg transition-all duration-300 ease-[cubic-bezier(0.34,1.56,0.64,1)] hover:scale-[1.03] active:scale-[0.97] disabled:bg-bg-elevated disabled:text-text-muted flex items-center justify-center cursor-pointer shadow-sm"
+              className="absolute right-2 h-[38px] px-5 bg-primary hover:bg-accent-sage text-bg-elevated hover:text-text-primary text-xs font-sans font-semibold rounded-lg transition-all duration-150 ease-out active:scale-[0.97] disabled:bg-bg-elevated disabled:text-text-muted flex items-center justify-center cursor-pointer shadow-sm"
             >
               {loading ? 'Starting...' : 'Research →'}
             </button>
@@ -141,7 +141,7 @@ export default function Home() {
               key={name}
               onClick={() => handleSuggestionClick(name)}
               disabled={loading}
-              className="text-text-secondary hover:text-text-primary border border-border-subtle bg-bg-surface hover:bg-bg-elevated px-3 py-1 rounded-full transition-all duration-300 ease-[cubic-bezier(0.34,1.56,0.64,1)] hover:scale-105 hover:translate-y-[-1px] active:scale-95 cursor-pointer shadow-sm"
+              className="text-text-secondary hover:text-text-primary border border-border-subtle bg-bg-surface hover:bg-bg-elevated px-3 py-1 rounded-full transition-colors duration-150 ease-out active:scale-95 cursor-pointer shadow-sm"
             >
               {name}
             </button>

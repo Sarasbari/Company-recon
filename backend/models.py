@@ -4,7 +4,7 @@ Provides type safety for tool inputs/outputs and the final synthesized dossier.
 """
 
 from pydantic import BaseModel, Field
-from typing import List, Optional
+from typing import List, Optional, Union
 
 
 class FundingInfo(BaseModel):
@@ -40,7 +40,7 @@ class Dossier(BaseModel):
     overview: str = ""
     industry: str = "Data unavailable"
     business_model: str = "Data unavailable"
-    founded: str = "Data unavailable"
+    founded: Union[int, str] = "Data unavailable"
     headquarters: str = "Data unavailable"
     headcount: str = "Data unavailable"
     funding: FundingInfo = Field(default_factory=FundingInfo)

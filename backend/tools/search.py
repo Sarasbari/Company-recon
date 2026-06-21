@@ -31,7 +31,7 @@ async def web_search(query: str) -> str:
                         "query": query,
                         "search_depth": "basic",
                         "include_answer": False,
-                        "max_results": 5
+                        "max_results": 4
                     }
                 )
                 
@@ -49,6 +49,8 @@ async def web_search(query: str) -> str:
                     title = res.get("title", "No Title")
                     url = res.get("url", "No URL")
                     snippet = res.get("content", "No content available.")
+                    if len(snippet) > 600:
+                        snippet = snippet[:600] + "..."
                     output.append(f"[{i}] {title}\nURL: {url}\nSnippet: {snippet}\n---")
                 return "\n".join(output)
         except Exception as e:

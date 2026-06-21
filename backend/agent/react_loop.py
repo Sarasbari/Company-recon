@@ -105,23 +105,40 @@ async def _run_agent_internal(company_name: str, queue: asyncio.Queue = None) ->
     groq_key = os.getenv("GROQ_API_KEY")
     anthropic_key = os.getenv("ANTHROPIC_API_KEY")
 
-    # Prioritize Gemini if its API key is set
+    # Build ordered list of available providers
+    providers = []
     if gemini_key and gemini_key not in ("mock_key", "your_gemini_api_key_here", ""):
-        return await run_gemini_agent(company_name, queue, start_time)
-
-    # Try Groq if its API key is set
+        providers.append(("Gemini", run_gemini_agent))
     if groq_key and groq_key not in ("mock_key", "your_groq_api_key_here", ""):
-        return await run_groq_agent(company_name, queue, start_time)
-
-    # Try Anthropic if its API key is set
+        providers.append(("Groq", run_groq_agent))
     if anthropic_key and anthropic_key not in ("mock_key", "your_anthropic_api_key_here", ""):
-        return await run_anthropic_agent(company_name, queue, start_time)
+        providers.append(("Anthropic", run_anthropic_agent))
 
-    # No LLM API key configured — fail with clear error
-    error_msg = (
-        "Configuration Error: No LLM API key configured. "
-        "Set at least one of GEMINI_API_KEY, GROQ_API_KEY, or ANTHROPIC_API_KEY in your .env file."
-    )
+    if not providers:
+        error_msg = (
+            "Configuration Error: No LLM API key configured. "
+            "Set at least one of GEMINI_API_KEY, GROQ_API_KEY, or ANTHROPIC_API_KEY in your .env file."
+        )
+        if queue:
+            await queue.put({"type": "error", "message": error_msg})
+        raise ValueError(error_msg)
+
+    # Cascade through providers — if one fails, try the next
+    last_error = None
+    for provider_name, provider_fn in providers:
+        try:
+            return await provider_fn(company_name, queue, start_time)
+        except Exception as e:
+            last_error = e
+            logger.warning(f"{provider_name} provider failed: {str(e)}. Trying next provider...")
+            if queue:
+                await queue.put({
+                    "type": "reason",
+                    "text": f"{provider_name} provider failed ({type(e).__name__}). Falling back to next provider..."
+                })
+
+    # All providers exhausted
+    error_msg = f"All LLM providers failed. Last error: {str(last_error)}"
     if queue:
         await queue.put({"type": "error", "message": error_msg})
     raise ValueError(error_msg)
@@ -353,7 +370,7 @@ LAST_GEMINI_REQUEST_TIME = 0.0
 GEMINI_MIN_INTERVAL = 4.1  # 4.1s to be safe under the 15 RPM limit
 
 
-async def gemini_post_with_retry(client, url, json_payload, queue=None, max_retries=6, initial_delay=5.0, backoff_factor=2.0):
+async def gemini_post_with_retry(client, url, json_payload, queue=None, max_retries=2, initial_delay=2.0, backoff_factor=2.0):
     global LAST_GEMINI_REQUEST_TIME
     delay = initial_delay
     for attempt in range(max_retries):
@@ -582,10 +599,77 @@ async def run_gemini_agent(company_name: str, queue: asyncio.Queue = None, start
 
 # ─── Groq Agent ─────────────────────────────────────────────────────────────
 
+async def groq_chat_completion_with_retry(client, **kwargs):
+    """
+    Helper to execute Groq chat completions with retries on transient rate limits (429).
+    Falls through immediately to trigger model fallback if the rate limit is long-term (e.g. 10m+).
+    """
+    attempts = 3
+    delay = 1.0
+    for attempt in range(attempts):
+        try:
+            return await client.chat.completions.create(**kwargs)
+        except Exception as e:
+            err_str = str(e).lower()
+            if "429" in err_str or "rate_limit" in err_str or "rate limit" in err_str:
+                if attempt < attempts - 1:
+                    sleep_time = delay
+                    if "try again in" in err_str:
+                        try:
+                            parts = err_str.split("try again in")[1].strip().split(" ")
+                            time_part = parts[0]
+                            if "ms" in time_part:
+                                time_part_clean = time_part.replace("ms", "").strip("., ")
+                                sleep_time = float(time_part_clean) / 1000.0 + 0.1
+                            elif "s" in time_part:
+                                time_part_clean = time_part.replace("s", "").strip("., ")
+                                if "m" in time_part_clean:
+                                    m_parts = time_part_clean.split("m")
+                                    sleep_time = float(m_parts[0]) * 60 + float(m_parts[1]) + 0.5
+                                else:
+                                    sleep_time = float(time_part_clean) + 0.5
+                        except Exception:
+                            pass
+                    
+                    if sleep_time > 10.0:
+                        # Fail immediately to trigger cascade
+                        raise e
+                    
+                    logger.warning(f"Groq API 429 rate limit hit. Retrying in {sleep_time:.2f}s (attempt {attempt + 1}/{attempts})...")
+                    await asyncio.sleep(sleep_time)
+                    delay *= 2.0
+                    continue
+            raise e
+
+
 async def run_groq_agent(company_name: str, queue: asyncio.Queue = None, start_time: float = None) -> dict:
     """
-    Runs the ReAct loop using Groq's free-tier API (llama-3.3-70b-versatile for research, llama-3.1-8b-instant for synthesis).
-    Uses the OpenAI-compatible chat completions API with tool calling.
+    Runs the ReAct loop using Groq's API with automatic fallback cascade.
+    Order: llama-3.3-70b-versatile -> llama-3.1-8b-instant
+    """
+    models = ["llama-3.3-70b-versatile", "llama-3.1-8b-instant"]
+    last_error = None
+    for model in models:
+        try:
+            return await _run_groq_agent_with_model(company_name, model, queue, start_time)
+        except Exception as e:
+            last_error = e
+            err_str = str(e).lower()
+            if "429" in err_str or "rate_limit" in err_str or "limit reached" in err_str or "413" in err_str or "too large" in err_str or "rate limit" in err_str:
+                logger.warning(f"Groq {model} rate limited or overloaded: {str(e)}. Trying next model...")
+                if queue:
+                    await queue.put({
+                        "type": "reason",
+                        "text": f"Groq {model} failed due to rate limits or message size. Trying next model..."
+                    })
+                continue
+            raise e
+    raise last_error
+
+
+async def _run_groq_agent_with_model(company_name: str, model_name: str, queue: asyncio.Queue = None, start_time: float = None) -> dict:
+    """
+    Runs the ReAct loop using Groq's OpenAI-compatible chat completions API with tool calling for a specific model.
     """
     from groq import AsyncGroq
 
@@ -641,12 +725,14 @@ async def run_groq_agent(company_name: str, queue: asyncio.Queue = None, start_t
 
     try:
         while iteration < MAX_ITERATIONS:
-            response = await client.chat.completions.create(
-                model="llama-3.3-70b-versatile",
+            response = await groq_chat_completion_with_retry(
+                client,
+                model=model_name,
                 messages=messages,
                 tools=tools,
                 tool_choice="auto",
-                max_tokens=1024
+                max_tokens=1024,
+                temperature=0.0
             )
 
             choice = response.choices[0]
@@ -658,10 +744,12 @@ async def run_groq_agent(company_name: str, queue: asyncio.Queue = None, start_t
                 await queue.put({"type": "reason", "text": reasoning_text})
 
             # Append assistant message to conversation
-            messages.append({
+            assistant_msg = {
                 "role": "assistant",
-                "content": reasoning_text,
-                "tool_calls": [
+                "content": reasoning_text
+            }
+            if assistant_message.tool_calls:
+                assistant_msg["tool_calls"] = [
                     {
                         "id": tc.id,
                         "type": "function",
@@ -670,9 +758,9 @@ async def run_groq_agent(company_name: str, queue: asyncio.Queue = None, start_t
                             "arguments": tc.function.arguments
                         }
                     }
-                    for tc in (assistant_message.tool_calls or [])
-                ] or None
-            })
+                    for tc in assistant_message.tool_calls
+                ]
+            messages.append(assistant_msg)
 
             # If no tool calls, agent has finished research
             if not assistant_message.tool_calls:
@@ -722,11 +810,13 @@ async def run_groq_agent(company_name: str, queue: asyncio.Queue = None, start_t
             {"role": "user", "content": SYNTHESIS_PROMPT}
         ]
 
-        synthesis_response = await client.chat.completions.create(
-            model="llama-3.3-70b-versatile",
+        synthesis_response = await groq_chat_completion_with_retry(
+            client,
+            model=model_name,
             messages=synthesis_messages,
             max_tokens=4000,
-            response_format={"type": "json_object"}
+            response_format={"type": "json_object"},
+            temperature=0.0
         )
 
         dossier_text = synthesis_response.choices[0].message.content or ""
@@ -744,7 +834,7 @@ async def run_groq_agent(company_name: str, queue: asyncio.Queue = None, start_t
         # Validate through Pydantic
         dossier = validate_dossier_with_pydantic(dossier)
 
-        populate_agent_metadata(dossier, iteration, tool_calls_count, duration, "groq/llama-3.3-70b-versatile", queue)
+        populate_agent_metadata(dossier, iteration, tool_calls_count, duration, f"groq/{model_name}", queue)
 
         existing_sources = set(dossier.get("sources", []))
         existing_sources.update(sources_visited)
@@ -756,7 +846,7 @@ async def run_groq_agent(company_name: str, queue: asyncio.Queue = None, start_t
         return dossier
 
     except Exception as e:
-        error_msg = f"Groq agent execution failed: {str(e)}"
+        error_msg = f"Groq agent execution failed on model {model_name}: {str(e)}"
         logger.error(error_msg)
         if queue:
             await queue.put({"type": "error", "message": error_msg})

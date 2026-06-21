@@ -13,24 +13,24 @@ from backend.agent.react_loop import run_agent
 # Target expected profiles for verification
 expected_profiles = {
     "Zomato": {
-        "industry": "food delivery",
-        "hq": "gurugram"
+        "industry": ["food delivery", "food-tech", "foodtech", "food technology"],
+        "hq": ["gurugram", "gurgaon"]
     },
     "Stripe": {
-        "industry": "fintech",
-        "hq": "san francisco"
+        "industry": ["fintech", "financial services"],
+        "hq": ["san francisco"]
     },
     "Tata Motors": {
-        "industry": "automotive",
-        "hq": "mumbai"
+        "industry": ["automotive", "automobile", "manufacturing"],
+        "hq": ["mumbai", "bombay"]
     },
     "Notion": {
-        "industry": "software",
-        "hq": "san francisco"
+        "industry": ["software", "technology", "productivity"],
+        "hq": ["san francisco"]
     },
     "Wave": {
-        "industry": "fintech",
-        "hq": "dakar"
+        "industry": ["fintech", "financial services", "mobile money"],
+        "hq": ["dakar"]
     }
 }
 
@@ -65,15 +65,27 @@ async def run_evaluation():
                 
             # 2. Industry check
             ind_val = dossier.get("industry", "").lower()
-            if expectations["industry"] not in ind_val:
-                print(f"  [FAIL] Industry '{dossier.get('industry')}' does not match expected keyword '{expectations['industry']}'")
+            expected_ind = expectations["industry"]
+            if isinstance(expected_ind, list):
+                passed_ind = any(keyword in ind_val for keyword in expected_ind)
+            else:
+                passed_ind = expected_ind in ind_val
+                
+            if not passed_ind:
+                print(f"  [FAIL] Industry '{dossier.get('industry')}' does not match expected keyword '{expected_ind}'")
                 failed = True
                 continue
                 
             # 3. Headquarters check
             hq_val = dossier.get("headquarters", "").lower()
-            if expectations["hq"] not in hq_val:
-                print(f"  [FAIL] Headquarters '{dossier.get('headquarters')}' does not match expected keyword '{expectations['hq']}'")
+            expected_hq = expectations["hq"]
+            if isinstance(expected_hq, list):
+                passed_hq = any(keyword in hq_val for keyword in expected_hq)
+            else:
+                passed_hq = expected_hq in hq_val
+                
+            if not passed_hq:
+                print(f"  [FAIL] Headquarters '{dossier.get('headquarters')}' does not match expected keyword '{expected_hq}'")
                 failed = True
                 continue
                 

@@ -8,7 +8,7 @@ You have access to the following tools:
 ### Required Fields to Investigate:
 1. Company overview (1-2 paragraphs)
 2. Industry & business model
-3. Founding year & HQ location
+3. Founding year & HQ location (Specific city and state/country, e.g., "Gurugram, Haryana, India" or "San Francisco, CA". Avoid just writing the country name.)
 4. Headcount estimate
 5. Funding stage & total raised (stage, total raised, last round, and key investors)
 6. Key people (CEO, CTO, founders, leadership)

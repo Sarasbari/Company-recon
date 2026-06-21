@@ -40,7 +40,7 @@ Construct 3 highly compelling, specific, and actionable sales talking points tha
   "company": "Company Name",
   "researched_at": "ISO-8601 Timestamp",
   "overview": "Overview paragraph (1-2 paragraphs summarizing business scope, value proposition, and targets)",
-  "industry": "Industry classification",
+  "industry": "Specific industry classification (e.g., 'Fintech', 'Food Delivery', 'Automotive', 'Productivity Software', 'SaaS'). Do NOT use generic terms like 'Information Technology' or 'Technology' if a more specific industry applies.",
   "business_model": "Business model description (e.g., B2B Subscription SaaS, Transactional commission, Direct-to-Consumer)",
   "founded": "Founding year (4-digit integer, e.g., 2018)",
   "headquarters": "City, State/Country",

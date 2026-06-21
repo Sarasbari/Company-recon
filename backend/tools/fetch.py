@@ -44,7 +44,7 @@ async def fetch_page(url: str) -> str:
                     if results and results[0].get("raw_content"):
                         raw_content = results[0]["raw_content"]
                         if raw_content.strip():
-                            return raw_content[:1800]
+                            return raw_content[:900]
                 else:
                     tavily_error = f"Tavily Extract API status {response.status_code}: {response.text}"
         except Exception as e:
@@ -74,7 +74,7 @@ async def fetch_page(url: str) -> str:
                     # Firecrawl v1 returns data.markdown
                     content = data.get("data", {}).get("markdown", "")
                     if content and content.strip():
-                        return content[:1800]
+                        return content[:900]
                 else:
                     firecrawl_error = f"Firecrawl API status {response.status_code}: {response.text}"
         except Exception as e:
@@ -92,7 +92,7 @@ async def fetch_page(url: str) -> str:
             if response.status_code == 200:
                 content = response.text.strip()
                 if content and len(content) > 50:
-                    return content[:1800]
+                    return content[:900]
                 else:
                     jina_error = "Jina Reader returned empty or very short content."
             else:
@@ -122,7 +122,7 @@ async def fetch_page(url: str) -> str:
             clean_text = "\n".join(chunk for chunk in chunks if chunk)
             
             if clean_text.strip():
-                return clean_text[:1800]  # Restrict response content size
+                return clean_text[:900]  # Restrict response content size
             else:
                 fallback_error = "Extracted page content was empty."
     except Exception as e:

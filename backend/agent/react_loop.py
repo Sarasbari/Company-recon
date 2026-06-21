@@ -605,7 +605,7 @@ async def groq_chat_completion_with_retry(client, **kwargs):
     Falls through immediately to trigger model fallback if the rate limit is long-term (e.g. 10m+).
     """
     attempts = 3
-    delay = 1.0
+    delay = 5.0
     for attempt in range(attempts):
         try:
             return await client.chat.completions.create(**kwargs)

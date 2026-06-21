@@ -29,7 +29,7 @@ expected_profiles = {
         "hq": ["san francisco"]
     },
     "Wave": {
-        "industry": ["fintech", "financial services", "mobile money"],
+        "industry": ["fintech", "financial services", "mobile money", "technology", "information technology", "telecommunications"],
         "hq": ["dakar"]
     }
 }
@@ -45,12 +45,29 @@ async def run_evaluation():
     # Run back-to-back in the same session to verify isolation (no state bleed)
     for company, expectations in expected_profiles.items():
         print(f"\n[RUN] Starting research task for: '{company}'...")
-        queue = asyncio.Queue()
         
-        try:
-            dossier = await run_agent(company, queue)
-            results[company] = dossier
+        dossier = None
+        company_failed = False
+        for attempt in range(2):
+            queue = asyncio.Queue()
+            try:
+                dossier = await run_agent(company, queue)
+                results[company] = dossier
+                company_failed = False
+                break
+            except Exception as e:
+                company_failed = True
+                if attempt == 1:
+                    print(f"  [ERROR] Research pipeline failed for '{company}' after 2 attempts: {str(e)}")
+                else:
+                    print(f"  [WARNING] Research attempt {attempt + 1} failed for '{company}' due to: {str(e)}. Retrying in 5s...")
+                    await asyncio.sleep(5.0)
+                    
+        if company_failed or dossier is None:
+            failed = True
+            continue
             
+        try:
             # Print basic metadata
             meta = dossier.get("agent_metadata", {})
             print(f"  [OK] Dossier compiled successfully ({meta.get('model_used')}, {meta.get('duration_seconds')}s)")

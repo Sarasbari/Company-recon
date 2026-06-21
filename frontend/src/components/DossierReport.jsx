@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Copy, Check, Briefcase, Users, TrendingUp, Award, FileText, Globe, Clock, Zap } from 'lucide-react';
+import { Copy, Check, Briefcase, Users, TrendingUp, Award, FileText, Globe, Clock, Zap, Download } from 'lucide-react';
 
 export default function DossierReport({ dossier, onResearchAgain }) {
   const [copiedIndex, setCopiedIndex] = useState(null);
@@ -8,6 +8,89 @@ export default function DossierReport({ dossier, onResearchAgain }) {
     navigator.clipboard.writeText(text);
     setCopiedIndex(idx);
     setTimeout(() => setCopiedIndex(null), 2000);
+  };
+
+  const handleExportMarkdown = () => {
+    if (!dossier) return;
+
+    const d = dossier;
+    const f = d.funding || {};
+    const meta = d.agent_metadata || {};
+
+    const lines = [
+      `# ${d.company || 'Company'} — Prospect Dossier`,
+      '',
+      `**Industry:** ${d.industry || 'N/A'}  `,
+      `**Headquarters:** ${d.headquarters || 'N/A'}  `,
+      `**Founded:** ${d.founded || 'N/A'}  `,
+      `**Business Model:** ${d.business_model || 'N/A'}  `,
+      `**Headcount:** ${d.headcount || 'N/A'}  `,
+      `**Researched At:** ${d.researched_at || 'N/A'}`,
+      '',
+      '---',
+      '',
+      '## Overview',
+      '',
+      d.overview || 'No overview available.',
+      '',
+      '---',
+      '',
+      '## Funding Profile',
+      '',
+      `| Field | Value |`,
+      `| :--- | :--- |`,
+      `| Stage | ${f.stage || 'N/A'} |`,
+      `| Total Raised | ${f.total_raised || 'N/A'} |`,
+      `| Last Round | ${f.last_round || 'N/A'} |`,
+      `| Key Investors | ${(f.investors || []).join(', ') || 'None identified'} |`,
+      '',
+      '---',
+      '',
+      '## Key People',
+      '',
+      ...(d.key_people && d.key_people.length > 0
+        ? d.key_people.map(p => `- **${p.name}** — ${p.role}`)
+        : ['No key people identified.']),
+      '',
+      '---',
+      '',
+      '## Talking Points',
+      '',
+      ...(d.talking_points && d.talking_points.length > 0
+        ? d.talking_points.map((tp, i) => `${i + 1}. ${tp}`)
+        : ['No talking points synthesized.']),
+      '',
+      '---',
+      '',
+      '## Recent News',
+      '',
+      ...(d.recent_news && d.recent_news.length > 0
+        ? d.recent_news.map(n => `### ${n.title}\n> ${n.date || 'Unknown date'}\n\n${n.summary || ''}\n\n[Read more](${n.url})`)
+        : ['No recent news available.']),
+      '',
+      '---',
+      '',
+      '## Sources',
+      '',
+      ...(d.sources && d.sources.length > 0
+        ? d.sources.map(s => `- ${s}`)
+        : ['None recorded.']),
+      '',
+      '---',
+      '',
+      `*Generated in ${meta.duration_seconds || 0}s using ${meta.tool_calls || 0} tool calls (${meta.model_used || 'Standard'})*`,
+    ];
+
+    const markdown = lines.join('\n');
+    const blob = new Blob([markdown], { type: 'text/markdown;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `${(d.company || 'dossier').replace(/[^a-zA-Z0-9]/g, '_')}_dossier.md`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
   };
 
   if (!dossier) return null;
@@ -53,12 +136,21 @@ export default function DossierReport({ dossier, onResearchAgain }) {
           </div>
         </div>
         {onResearchAgain && (
-          <button
-            onClick={onResearchAgain}
-            className="self-start md:self-center bg-bg-primary hover:bg-accent-sage/20 border border-border-subtle text-primary font-sans text-xs font-semibold py-2 px-4 rounded-lg transition-all duration-150 ease-out active:scale-[0.97] cursor-pointer shadow-xs"
-          >
-            Research Again
-          </button>
+          <div className="flex items-center gap-2 self-start md:self-center">
+            <button
+              onClick={handleExportMarkdown}
+              className="bg-bg-primary hover:bg-accent-sage/20 border border-border-subtle text-primary font-sans text-xs font-semibold py-2 px-4 rounded-lg flex items-center gap-1.5 transition-all duration-150 ease-out active:scale-[0.97] cursor-pointer shadow-xs"
+            >
+              <Download size={13} />
+              Export .md
+            </button>
+            <button
+              onClick={onResearchAgain}
+              className="bg-bg-primary hover:bg-accent-sage/20 border border-border-subtle text-primary font-sans text-xs font-semibold py-2 px-4 rounded-lg transition-all duration-150 ease-out active:scale-[0.97] cursor-pointer shadow-xs"
+            >
+              Research Again
+            </button>
+          </div>
         )}
       </div>
 

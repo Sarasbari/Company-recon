@@ -36,17 +36,23 @@ async def health_check():
     Health check endpoint. Indicates whether server is active and configuration status.
     """
     gemini_configured = bool(os.getenv("GEMINI_API_KEY") and os.getenv("GEMINI_API_KEY") not in ("mock_key", "your_gemini_api_key_here", ""))
+    groq_configured = bool(os.getenv("GROQ_API_KEY") and os.getenv("GROQ_API_KEY") not in ("mock_key", "your_groq_api_key_here", ""))
     anthropic_configured = bool(os.getenv("ANTHROPIC_API_KEY") and os.getenv("ANTHROPIC_API_KEY") not in ("mock_key", "your_anthropic_api_key_here", ""))
     tavily_configured = bool(os.getenv("TAVILY_API_KEY") and os.getenv("TAVILY_API_KEY") not in ("mock_key", "your_tavily_api_key_here", ""))
+    firecrawl_configured = bool(os.getenv("FIRECRAWL_API_KEY") and os.getenv("FIRECRAWL_API_KEY") not in ("mock_key", "your_firecrawl_api_key_here", ""))
     supabase_configured = bool(os.getenv("SUPABASE_URL") and os.getenv("SUPABASE_URL") not in ("mock_url", "your_supabase_url_here", ""))
+    
+    llm_configured = gemini_configured or groq_configured or anthropic_configured
     
     return {
         "status": "healthy",
-        "mock_mode": not ((anthropic_configured or gemini_configured) and tavily_configured),
+        "mock_mode": not (llm_configured and tavily_configured),
         "config": {
             "gemini_api": "configured" if gemini_configured else "mock/missing",
+            "groq_api": "configured" if groq_configured else "mock/missing",
             "anthropic_api": "configured" if anthropic_configured else "mock/missing",
             "tavily_api": "configured" if tavily_configured else "mock/missing",
+            "firecrawl_api": "configured" if firecrawl_configured else "mock/missing",
             "supabase": "configured" if supabase_configured else "mock/missing",
             "clerk": "configured" if os.getenv("CLERK_PUBLISHABLE_KEY") and os.getenv("CLERK_PUBLISHABLE_KEY") != "mock_key" else "missing"
         }

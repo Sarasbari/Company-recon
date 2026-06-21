@@ -4,6 +4,8 @@ from jwt import PyJWKClient
 from fastapi import Request, HTTPException
 from typing import Optional
 
+from backend.logging_config import logger
+
 # Global cache for JWK client
 _jwk_client = None
 
@@ -64,7 +66,7 @@ async def get_user_id(request: Request) -> Optional[str]:
         )
         return payload.get("sub")
     except Exception as e:
-        print(f"JWT Verification failed: {str(e)}")
+        logger.warning(f"JWT Verification failed: {str(e)}")
         raise HTTPException(status_code=401, detail=f"Invalid authentication token: {str(e)}")
 
 async def require_user_id(request: Request) -> str:

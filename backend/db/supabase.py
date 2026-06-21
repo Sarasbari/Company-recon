@@ -2,6 +2,8 @@ import os
 import uuid
 import datetime
 from typing import List, Dict, Optional
+
+from backend.logging_config import logger
 from supabase import create_client, Client
 
 # In-memory dictionary to act as a database when Supabase is not configured or in Mock Mode
@@ -19,7 +21,7 @@ def get_supabase_client() -> Optional[Client]:
     try:
         return create_client(url, key)
     except Exception as e:
-        print(f"Supabase client initialization failed: {str(e)}")
+        logger.error(f"Supabase client initialization failed: {str(e)}")
         return None
 
 async def save_dossier(user_id: str, company: str, status: str, dossier: Optional[dict] = None, dossier_id: Optional[str] = None) -> str:
@@ -53,7 +55,7 @@ async def save_dossier(user_id: str, company: str, status: str, dossier: Optiona
             return res.data[0]["id"]
         return dossier_id
     except Exception as e:
-        print(f"Supabase save failed: {str(e)}. Storing in-memory instead.")
+        logger.error(f"Supabase save failed: {str(e)}. Storing in-memory instead.")
         _mock_dossiers_db[dossier_id] = data
         return dossier_id
 
@@ -71,7 +73,7 @@ async def get_dossier_by_id_only(dossier_id: str) -> Optional[dict]:
             return res.data[0]
         return None
     except Exception as e:
-        print(f"Supabase fetch single by id failed: {str(e)}")
+        logger.error(f"Supabase fetch single by id failed: {str(e)}")
         return _mock_dossiers_db.get(dossier_id)
 
 async def update_dossier(dossier_id: str, status: str, dossier: Optional[dict] = None) -> None:
@@ -101,7 +103,7 @@ async def update_dossier(dossier_id: str, status: str, dossier: Optional[dict] =
             
         client.table("dossiers").update(data).eq("id", dossier_id).execute()
     except Exception as e:
-        print(f"Supabase update failed: {str(e)}")
+        logger.error(f"Supabase update failed: {str(e)}")
         # Check mock fallback
         if dossier_id in _mock_dossiers_db:
             _mock_dossiers_db[dossier_id]["status"] = status
@@ -121,7 +123,7 @@ async def get_dossiers(user_id: str) -> List[dict]:
         res = client.table("dossiers").select("*").eq("user_id", user_id).order("created_at", desc=True).execute()
         return res.data or []
     except Exception as e:
-        print(f"Supabase fetch list failed: {str(e)}. Returning in-memory dossiers.")
+        logger.error(f"Supabase fetch list failed: {str(e)}. Returning in-memory dossiers.")
         return [row for row in _mock_dossiers_db.values() if row["user_id"] == user_id]
 
 async def get_dossier(dossier_id: str, user_id: str) -> Optional[dict]:
@@ -141,7 +143,7 @@ async def get_dossier(dossier_id: str, user_id: str) -> Optional[dict]:
             return res.data[0]
         return None
     except Exception as e:
-        print(f"Supabase fetch single failed: {str(e)}")
+        logger.error(f"Supabase fetch single failed: {str(e)}")
         row = _mock_dossiers_db.get(dossier_id)
         if row and row["user_id"] == user_id:
             return row
@@ -162,7 +164,7 @@ async def delete_dossier(dossier_id: str, user_id: str) -> bool:
         res = client.table("dossiers").delete().eq("id", dossier_id).eq("user_id", user_id).execute()
         return len(res.data) > 0 if res.data else True
     except Exception as e:
-        print(f"Supabase delete failed: {str(e)}")
+        logger.error(f"Supabase delete failed: {str(e)}")
         if dossier_id in _mock_dossiers_db and _mock_dossiers_db[dossier_id]["user_id"] == user_id:
             del _mock_dossiers_db[dossier_id]
             return True

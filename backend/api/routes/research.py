@@ -7,6 +7,8 @@ from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field
 from typing import Optional, Dict
 
+from backend.logging_config import logger
+
 from backend.api.jobs import create_job, get_job_queue
 from backend.api.middleware.auth import get_user_id
 from backend.agent.react_loop import run_agent
@@ -57,7 +59,7 @@ async def run_agent_background(company: str, job_id: str, queue: asyncio.Queue, 
                 await update_dossier(db_dossier_id, "complete", dossier)
                 
         except Exception as e:
-            print(f"Background agent execution failed for job {job_id}: {str(e)}")
+            logger.error(f"Background agent execution failed for job {job_id}: {str(e)}")
             job_status_store[job_id] = {"status": "failed", "error": str(e)}
             if db_dossier_id:
                 await update_dossier(db_dossier_id, "failed")

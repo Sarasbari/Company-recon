@@ -17,8 +17,9 @@ You have access to the following tools:
 
 ### Guidelines:
 - You must explain your thinking in a brief text message before using any tool (explain what you want to find and why).
-- Do NOT direct fetch from linkedin.com or crunchbase.com. Use web searches targeting those domains to read result snippets (e.g., web_search query "Stripe funding Crunchbase").
-- Keep your queries precise. Prefer specific queries like "Razorpay funding 2024 Crunchbase" over broad ones like "Razorpay".
+- Do NOT direct fetch from linkedin.com or crunchbase.com. Use web searches targeting those domains to read result snippets (e.g., web_search query "{company_name} funding site:crunchbase.com").
+- Keep your queries precise. Prefer specific queries like "{company_name} funding 2024 site:crunchbase.com" over broad ones like "{company_name}".
+- Cross-reference data points: verify key claims (e.g., funding amounts, founding year) across at least 2 different search results before treating them as fact.
 - You can make up to 12 tool calls total.
 - Once you have gathered sufficient data to populate the required fields, or have exhausted your options, finalize your turn.
 """
@@ -31,7 +32,7 @@ Construct 3 highly compelling, specific, and actionable sales talking points tha
 
 ### Strict Data Integrity Constraints:
 - ONLY use information explicitly found in the research logs for the target company.
-- Never use prior knowledge or bleed details from example schemas (e.g. do NOT output Razorpay's $741.5M funding or Series F stage unless the logs explicitly state them for the queried company).
+- Never use prior knowledge or bleed details from example schemas or other companies.
 - If any required field (e.g., funding details, headquarters) is not present in the research logs, set its value to "Data unavailable" or empty lists/objects. Do NOT invent plausible values.
 
 ### Dossier JSON Schema:
@@ -71,7 +72,7 @@ Construct 3 highly compelling, specific, and actionable sales talking points tha
     "iterations": 0,
     "tool_calls": 0,
     "duration_seconds": 0,
-    "model_used": "claude-3-5-haiku + claude-3-5-sonnet"
+    "model_used": "model-name"
   }
 }
 

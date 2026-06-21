@@ -3,13 +3,20 @@ import httpx
 from bs4 import BeautifulSoup
 from urllib.parse import urlparse
 
+from backend.logging_config import logger
+
 BLOCKED_DOMAINS = ["linkedin.com", "crunchbase.com", "glassdoor.com"]
+
 
 async def fetch_page(url: str) -> str:
     """
     Fetch and extract readable text content from a URL.
     Bypasses direct fetching for blocked domains like linkedin.com and crunchbase.com.
-    Tries Tavily Extract, and falls back to httpx + BeautifulSoup4.
+    Uses a 4-tier fallback chain:
+      1. Tavily Extract API (requires TAVILY_API_KEY)
+      2. Firecrawl API (requires FIRECRAWL_API_KEY)
+      3. Jina Reader (free, no key needed)
+      4. httpx + BeautifulSoup4 (raw fallback)
     """
     parsed_url = urlparse(url)
     domain = parsed_url.netloc.lower()
@@ -18,47 +25,82 @@ async def fetch_page(url: str) -> str:
     if any(blocked in domain for blocked in BLOCKED_DOMAINS):
         return f"Scraping blocked for domain: {domain}. Direct crawling is prohibited on this domain to avoid bot blocks. Please rely on search snippets instead."
 
-    api_key = os.getenv("TAVILY_API_KEY")
-    if not api_key or api_key == "mock_key":
-        if "razorpay.com" in domain:
-            return (
-                "Razorpay is India's first Neobank and payment solution that helps businesses manage money. "
-                "Founded in 2014 by Harshil Mathur and Shashank Kumar. Our product offering includes Payment Gateway, "
-                "RazorpayX (Business Banking), Razorpay Capital (Working Capital Loans), and Payroll management. "
-                "We serve over 10 million businesses of all sizes, accepting 100+ payment modes. "
-                "HQ location is Bengaluru, Karnataka, India."
-            )
-        elif "techcrunch.com" in domain:
-            return (
-                "Fintech giant Razorpay co-founders Harshil Mathur and Shashank Kumar announced their Series F round of $375 million today. "
-                "The round was co-led by GIC and Lone Pine Capital. It will be used for expansion into Southeast Asia markets, starting with Malaysia."
-            )
-        return f"Mock content for page at {url}. This domain represents information retrieved in Mock Mode."
-
-    # Method 1: Try Tavily Extract API
+    # --- Method 1: Try Tavily Extract API ---
     tavily_error = None
-    try:
-        async with httpx.AsyncClient(timeout=10.0) as client:
-            response = await client.post(
-                "https://api.tavily.com/extract",
-                json={
-                    "api_key": api_key,
-                    "urls": [url]
-                }
-            )
-            if response.status_code == 200:
-                data = response.json()
-                results = data.get("results", [])
-                if results and results[0].get("raw_content"):
-                    raw_content = results[0]["raw_content"]
-                    if raw_content.strip():
-                        return raw_content[:4000]
-            else:
-                tavily_error = f"Tavily Extract API status {response.status_code}: {response.text}"
-    except Exception as e:
-        tavily_error = f"Tavily Extract failed: {str(e)}"
+    api_key = os.getenv("TAVILY_API_KEY")
+    if api_key and api_key not in ("mock_key", "your_tavily_api_key_here", ""):
+        try:
+            async with httpx.AsyncClient(timeout=10.0) as client:
+                response = await client.post(
+                    "https://api.tavily.com/extract",
+                    json={
+                        "api_key": api_key,
+                        "urls": [url]
+                    }
+                )
+                if response.status_code == 200:
+                    data = response.json()
+                    results = data.get("results", [])
+                    if results and results[0].get("raw_content"):
+                        raw_content = results[0]["raw_content"]
+                        if raw_content.strip():
+                            return raw_content[:4000]
+                else:
+                    tavily_error = f"Tavily Extract API status {response.status_code}: {response.text}"
+        except Exception as e:
+            tavily_error = f"Tavily Extract failed: {str(e)}"
+    else:
+        tavily_error = "TAVILY_API_KEY not configured, skipping Tavily Extract."
 
-    # Method 2: Fallback with httpx and BeautifulSoup4
+    # --- Method 2: Try Firecrawl API ---
+    firecrawl_error = None
+    firecrawl_key = os.getenv("FIRECRAWL_API_KEY")
+    if firecrawl_key and firecrawl_key not in ("mock_key", "your_firecrawl_api_key_here", ""):
+        try:
+            async with httpx.AsyncClient(timeout=15.0) as client:
+                response = await client.post(
+                    "https://api.firecrawl.dev/v1/scrape",
+                    headers={
+                        "Authorization": f"Bearer {firecrawl_key}",
+                        "Content-Type": "application/json"
+                    },
+                    json={
+                        "url": url,
+                        "formats": ["markdown"]
+                    }
+                )
+                if response.status_code == 200:
+                    data = response.json()
+                    # Firecrawl v1 returns data.markdown
+                    content = data.get("data", {}).get("markdown", "")
+                    if content and content.strip():
+                        return content[:4000]
+                else:
+                    firecrawl_error = f"Firecrawl API status {response.status_code}: {response.text}"
+        except Exception as e:
+            firecrawl_error = f"Firecrawl failed: {str(e)}"
+    else:
+        firecrawl_error = "FIRECRAWL_API_KEY not configured, skipping Firecrawl."
+
+    # --- Method 3: Try Jina Reader (free, no API key needed) ---
+    jina_error = None
+    try:
+        jina_url = f"https://r.jina.ai/{url}"
+        headers = {"Accept": "text/plain"}
+        async with httpx.AsyncClient(timeout=15.0) as client:
+            response = await client.get(jina_url, headers=headers)
+            if response.status_code == 200:
+                content = response.text.strip()
+                if content and len(content) > 50:
+                    return content[:4000]
+                else:
+                    jina_error = "Jina Reader returned empty or very short content."
+            else:
+                jina_error = f"Jina Reader status {response.status_code}"
+    except Exception as e:
+        jina_error = f"Jina Reader failed: {str(e)}"
+
+    # --- Method 4: Fallback with httpx and BeautifulSoup4 ---
     fallback_error = None
     try:
         headers = {
@@ -86,5 +128,10 @@ async def fetch_page(url: str) -> str:
     except Exception as e:
         fallback_error = str(e)
 
-    # Both failed - return descriptive failure message
-    return f"Failed to fetch content from {url} after trying Tavily Extract and BeautifulSoup fallback. Tavily Error: {tavily_error}. Fallback Error: {fallback_error}."
+    # All methods failed - return descriptive failure message
+    logger.warning(f"All fetch methods failed for {url}: Tavily={tavily_error}, Firecrawl={firecrawl_error}, Jina={jina_error}, BS4={fallback_error}")
+    return (
+        f"Failed to fetch content from {url} after trying all available methods. "
+        f"Tavily: {tavily_error}. Firecrawl: {firecrawl_error}. "
+        f"Jina Reader: {jina_error}. BeautifulSoup: {fallback_error}."
+    )

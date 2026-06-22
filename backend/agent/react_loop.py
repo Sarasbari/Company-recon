@@ -637,8 +637,8 @@ async def groq_chat_completion_with_retry(client, **kwargs):
                         except Exception:
                             pass
                     
-                    if sleep_time > 10.0:
-                        # Fail immediately to trigger cascade
+                    if sleep_time > 60.0:
+                        # Fail immediately to trigger cascade if sleep is too long
                         raise e
                     
                     logger.warning(f"Groq API 429 rate limit hit. Retrying in {sleep_time:.2f}s (attempt {attempt + 1}/{attempts})...")
@@ -858,5 +858,5 @@ async def _run_groq_agent_with_model(company_name: str, model_name: str, queue: 
         error_msg = f"Groq agent execution failed on model {model_name}: {str(e)}"
         logger.error(error_msg)
         if queue:
-            await queue.put({"type": "error", "message": error_msg})
+            await queue.put({"type": "reason", "text": error_msg})
         raise e

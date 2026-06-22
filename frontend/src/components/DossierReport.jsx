@@ -17,6 +17,70 @@ export default function DossierReport({ dossier, onResearchAgain }) {
     const f = d.funding || {};
     const meta = d.agent_metadata || {};
 
+    // Detect purpose from dossier
+    let actualPurpose = d.purpose || 'general';
+    const pm = d.purpose_module;
+    if (!d.purpose && pm) {
+      if (pm.trigger_events || pm.buying_signals) {
+        actualPurpose = 'sales';
+      } else if (pm.valuation_trend || pm.competitors || pm.risk_flags) {
+        actualPurpose = 'investor';
+      } else if (pm.culture_signals || pm.interview_questions) {
+        actualPurpose = 'job_seeker';
+      }
+    }
+
+    let purposeLines = [];
+    if (actualPurpose === 'sales' && pm) {
+      purposeLines.push('## Sales Angles', '');
+      if (pm.trigger_events && pm.trigger_events.length > 0) {
+        purposeLines.push('### Trigger Events', '');
+        pm.trigger_events.forEach(e => purposeLines.push(`- ${e}`));
+        purposeLines.push('');
+      }
+      if (pm.buying_signals && pm.buying_signals.length > 0) {
+        purposeLines.push('### Buying Signals', '');
+        pm.buying_signals.forEach(s => purposeLines.push(`- ${s}`));
+        purposeLines.push('');
+      }
+    } else if (actualPurpose === 'investor' && pm) {
+      purposeLines.push('## Investor Notes', '');
+      if (pm.valuation_trend) {
+        purposeLines.push('### Valuation Trend', '', pm.valuation_trend, '');
+      }
+      if (pm.competitors && pm.competitors.length > 0) {
+        purposeLines.push('### Named Competitors', '');
+        pm.competitors.forEach(c => purposeLines.push(`- ${c}`));
+        purposeLines.push('');
+      }
+      if (pm.risk_flags && pm.risk_flags.length > 0) {
+        purposeLines.push('### Risk Flags', '');
+        pm.risk_flags.forEach(r => purposeLines.push(`- ${r}`));
+        purposeLines.push('');
+      }
+    } else if (actualPurpose === 'job_seeker' && pm) {
+      purposeLines.push('## Interview Prep', '');
+      if (pm.culture_signals && pm.culture_signals.length > 0) {
+        purposeLines.push('### Culture Signals', '');
+        pm.culture_signals.forEach(c => purposeLines.push(`- ${c}`));
+        purposeLines.push('');
+      }
+      if (pm.interview_questions && pm.interview_questions.length > 0) {
+        purposeLines.push('### Likely Interview Questions', '');
+        pm.interview_questions.forEach(q => purposeLines.push(`- Q: ${q}`));
+        purposeLines.push('');
+      }
+    } else {
+      purposeLines.push(
+        '## Talking Points',
+        '',
+        ...(d.talking_points && d.talking_points.length > 0
+          ? d.talking_points.map((tp, i) => `${i + 1}. ${tp}`)
+          : ['No talking points synthesized.']),
+        ''
+      );
+    }
+
     const lines = [
       `# ${d.company || 'Company'} — Prospect Dossier`,
       '',
@@ -54,12 +118,7 @@ export default function DossierReport({ dossier, onResearchAgain }) {
       '',
       '---',
       '',
-      '## Talking Points',
-      '',
-      ...(d.talking_points && d.talking_points.length > 0
-        ? d.talking_points.map((tp, i) => `${i + 1}. ${tp}`)
-        : ['No talking points synthesized.']),
-      '',
+      ...purposeLines,
       '---',
       '',
       '## Recent News',
@@ -107,9 +166,31 @@ export default function DossierReport({ dossier, onResearchAgain }) {
     key_people = [],
     recent_news = [],
     talking_points = [],
+    purpose = 'general',
+    purpose_module = null,
     sources = [],
     agent_metadata = {}
   } = dossier;
+
+  let actualPurpose = purpose || 'general';
+  const pm = purpose_module;
+  if (!purpose && pm) {
+    if (pm.trigger_events || pm.buying_signals) {
+      actualPurpose = 'sales';
+    } else if (pm.valuation_trend || pm.competitors || pm.risk_flags) {
+      actualPurpose = 'investor';
+    } else if (pm.culture_signals || pm.interview_questions) {
+      actualPurpose = 'job_seeker';
+    }
+  }
+
+  const headingMap = {
+    sales: 'Sales Angles',
+    investor: 'Investor Notes',
+    job_seeker: 'Interview Prep',
+    general: 'Talking Points'
+  };
+  const currentHeading = headingMap[actualPurpose] || 'Talking Points';
 
   const fundingStage = funding.stage || 'Data unavailable';
   const fundingTotal = funding.total_raised || 'Data unavailable';
@@ -258,41 +339,166 @@ export default function DossierReport({ dossier, onResearchAgain }) {
         )}
       </div>
 
-      {/* Talking Points (Hero Output) */}
+      {/* Talking Points / Purpose Module (Hero Output) */}
       <div 
         className="space-y-4 bg-accent-amber/5 border border-accent-amber/30 rounded-xl p-6 md:p-8 animate-fade-in opacity-0"
         style={{ animationDelay: '200ms' }}
       >
         <h2 className="font-display text-xl font-medium text-accent-amber flex items-center gap-2">
           <Award size={20} className="text-accent-amber" />
-          Talking Points
+          {currentHeading}
         </h2>
-        <div className="space-y-3">
-          {talking_points.length > 0 ? (
-            talking_points.map((point, idx) => (
-              <div
-                key={idx}
-                className="bg-bg-elevated border border-border-subtle/80 hover:border-accent-amber/40 rounded-xl p-4 text-sm font-sans text-text-primary leading-relaxed relative flex gap-3 transition-colors duration-200 hover:shadow-xs group"
-              >
-                <span className="text-accent-amber font-mono font-bold">{idx + 1}.</span>
-                <span className="flex-1 pr-8">{point}</span>
-                <button
-                  onClick={() => handleCopy(point, idx)}
-                  className="absolute right-3 top-3 text-text-secondary hover:text-accent-amber cursor-pointer p-1 rounded-lg hover:bg-bg-primary transition-all duration-200 md:opacity-0 md:group-hover:opacity-100"
-                  title="Copy talking point"
-                >
-                  {copiedIndex === idx ? (
-                    <Check size={14} className="text-accent-green" />
-                  ) : (
-                    <Copy size={14} />
-                  )}
-                </button>
+        
+        {actualPurpose === 'sales' && pm && (
+          <div className="space-y-6">
+            {pm.trigger_events && pm.trigger_events.length > 0 && (
+              <div className="space-y-3">
+                <h3 className="font-display font-medium text-xs text-accent-amber/90 uppercase tracking-wider">Trigger Events</h3>
+                <div className="space-y-2">
+                  {pm.trigger_events.map((event, idx) => (
+                    <div key={idx} className="bg-bg-elevated border border-border-subtle/80 hover:border-accent-amber/40 rounded-xl p-4 text-sm font-sans text-text-primary leading-relaxed relative flex gap-3 transition-colors duration-200 hover:shadow-xs group">
+                      <span className="text-accent-amber font-mono font-bold">•</span>
+                      <span className="flex-1 pr-8">{event}</span>
+                      <button onClick={() => handleCopy(event, `te-${idx}`)} className="absolute right-3 top-3 text-text-secondary hover:text-accent-amber cursor-pointer p-1 rounded-lg hover:bg-bg-primary transition-all duration-200 md:opacity-0 md:group-hover:opacity-100">
+                        {copiedIndex === `te-${idx}` ? <Check size={14} className="text-accent-green" /> : <Copy size={14} />}
+                      </button>
+                    </div>
+                  ))}
+                </div>
               </div>
-            ))
-          ) : (
-            <p className="text-xs text-text-muted font-mono italic">No Talking Points synthesized.</p>
-          )}
-        </div>
+            )}
+            {pm.buying_signals && pm.buying_signals.length > 0 && (
+              <div className="space-y-3">
+                <h3 className="font-display font-medium text-xs text-accent-amber/90 uppercase tracking-wider">Buying Signals</h3>
+                <div className="space-y-2">
+                  {pm.buying_signals.map((signal, idx) => (
+                    <div key={idx} className="bg-bg-elevated border border-border-subtle/80 hover:border-accent-amber/40 rounded-xl p-4 text-sm font-sans text-text-primary leading-relaxed relative flex gap-3 transition-colors duration-200 hover:shadow-xs group">
+                      <span className="text-accent-amber font-mono font-bold">•</span>
+                      <span className="flex-1 pr-8">{signal}</span>
+                      <button onClick={() => handleCopy(signal, `bs-${idx}`)} className="absolute right-3 top-3 text-text-secondary hover:text-accent-amber cursor-pointer p-1 rounded-lg hover:bg-bg-primary transition-all duration-200 md:opacity-0 md:group-hover:opacity-100">
+                        {copiedIndex === `bs-${idx}` ? <Check size={14} className="text-accent-green" /> : <Copy size={14} />}
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+
+        {actualPurpose === 'investor' && pm && (
+          <div className="space-y-6">
+            {pm.valuation_trend && (
+              <div className="space-y-3">
+                <h3 className="font-display font-medium text-xs text-accent-amber/90 uppercase tracking-wider">Valuation Trend</h3>
+                <div className="bg-bg-elevated border border-border-subtle/80 hover:border-accent-amber/40 rounded-xl p-4 text-sm font-sans text-text-primary leading-relaxed relative flex gap-3 transition-colors duration-200 hover:shadow-xs group">
+                  <span className="flex-1 pr-8">{pm.valuation_trend}</span>
+                  <button onClick={() => handleCopy(pm.valuation_trend, `vt`)} className="absolute right-3 top-3 text-text-secondary hover:text-accent-amber cursor-pointer p-1 rounded-lg hover:bg-bg-primary transition-all duration-200 md:opacity-0 md:group-hover:opacity-100">
+                    {copiedIndex === `vt` ? <Check size={14} className="text-accent-green" /> : <Copy size={14} />}
+                  </button>
+                </div>
+              </div>
+            )}
+            {pm.competitors && pm.competitors.length > 0 && (
+              <div className="space-y-3">
+                <h3 className="font-display font-medium text-xs text-accent-amber/90 uppercase tracking-wider">Named Competitors</h3>
+                <div className="space-y-2">
+                  {pm.competitors.map((comp, idx) => (
+                    <div key={idx} className="bg-bg-elevated border border-border-subtle/80 hover:border-accent-amber/40 rounded-xl p-4 text-sm font-sans text-text-primary leading-relaxed relative flex gap-3 transition-colors duration-200 hover:shadow-xs group">
+                      <span className="text-accent-amber font-mono font-bold">•</span>
+                      <span className="flex-1 pr-8">{comp}</span>
+                      <button onClick={() => handleCopy(comp, `comp-${idx}`)} className="absolute right-3 top-3 text-text-secondary hover:text-accent-amber cursor-pointer p-1 rounded-lg hover:bg-bg-primary transition-all duration-200 md:opacity-0 md:group-hover:opacity-100">
+                        {copiedIndex === `comp-${idx}` ? <Check size={14} className="text-accent-green" /> : <Copy size={14} />}
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+            {pm.risk_flags && pm.risk_flags.length > 0 && (
+              <div className="space-y-3">
+                <h3 className="font-display font-medium text-xs text-accent-amber/90 uppercase tracking-wider">Risk Flags</h3>
+                <div className="space-y-2">
+                  {pm.risk_flags.map((risk, idx) => (
+                    <div key={idx} className="bg-bg-elevated border border-border-subtle/80 hover:border-accent-amber/40 rounded-xl p-4 text-sm font-sans text-text-primary leading-relaxed relative flex gap-3 transition-colors duration-200 hover:shadow-xs group">
+                      <span className="text-accent-amber font-mono font-bold">•</span>
+                      <span className="flex-1 pr-8">{risk}</span>
+                      <button onClick={() => handleCopy(risk, `risk-${idx}`)} className="absolute right-3 top-3 text-text-secondary hover:text-accent-amber cursor-pointer p-1 rounded-lg hover:bg-bg-primary transition-all duration-200 md:opacity-0 md:group-hover:opacity-100">
+                        {copiedIndex === `risk-${idx}` ? <Check size={14} className="text-accent-green" /> : <Copy size={14} />}
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+
+        {actualPurpose === 'job_seeker' && pm && (
+          <div className="space-y-6">
+            {pm.culture_signals && pm.culture_signals.length > 0 && (
+              <div className="space-y-3">
+                <h3 className="font-display font-medium text-xs text-accent-amber/90 uppercase tracking-wider">Culture Signals</h3>
+                <div className="space-y-2">
+                  {pm.culture_signals.map((signal, idx) => (
+                    <div key={idx} className="bg-bg-elevated border border-border-subtle/80 hover:border-accent-amber/40 rounded-xl p-4 text-sm font-sans text-text-primary leading-relaxed relative flex gap-3 transition-colors duration-200 hover:shadow-xs group">
+                      <span className="text-accent-amber font-mono font-bold">•</span>
+                      <span className="flex-1 pr-8">{signal}</span>
+                      <button onClick={() => handleCopy(signal, `culture-${idx}`)} className="absolute right-3 top-3 text-text-secondary hover:text-accent-amber cursor-pointer p-1 rounded-lg hover:bg-bg-primary transition-all duration-200 md:opacity-0 md:group-hover:opacity-100">
+                        {copiedIndex === `culture-${idx}` ? <Check size={14} className="text-accent-green" /> : <Copy size={14} />}
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+            {pm.interview_questions && pm.interview_questions.length > 0 && (
+              <div className="space-y-3">
+                <h3 className="font-display font-medium text-xs text-accent-amber/90 uppercase tracking-wider">Likely Interview Questions</h3>
+                <div className="space-y-2">
+                  {pm.interview_questions.map((q, idx) => (
+                    <div key={idx} className="bg-bg-elevated border border-border-subtle/80 hover:border-accent-amber/40 rounded-xl p-4 text-sm font-sans text-text-primary leading-relaxed relative flex gap-3 transition-colors duration-200 hover:shadow-xs group">
+                      <span className="text-accent-amber font-mono font-bold">Q:</span>
+                      <span className="flex-1 pr-8">{q}</span>
+                      <button onClick={() => handleCopy(q, `q-${idx}`)} className="absolute right-3 top-3 text-text-secondary hover:text-accent-amber cursor-pointer p-1 rounded-lg hover:bg-bg-primary transition-all duration-200 md:opacity-0 md:group-hover:opacity-100">
+                        {copiedIndex === `q-${idx}` ? <Check size={14} className="text-accent-green" /> : <Copy size={14} />}
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+
+        {actualPurpose === 'general' && (
+          <div className="space-y-3">
+            {talking_points.length > 0 ? (
+              talking_points.map((point, idx) => (
+                <div
+                  key={idx}
+                  className="bg-bg-elevated border border-border-subtle/80 hover:border-accent-amber/40 rounded-xl p-4 text-sm font-sans text-text-primary leading-relaxed relative flex gap-3 transition-colors duration-200 hover:shadow-xs group"
+                >
+                  <span className="text-accent-amber font-mono font-bold">{idx + 1}.</span>
+                  <span className="flex-1 pr-8">{point}</span>
+                  <button
+                    onClick={() => handleCopy(point, idx)}
+                    className="absolute right-3 top-3 text-text-secondary hover:text-accent-amber cursor-pointer p-1 rounded-lg hover:bg-bg-primary transition-all duration-200 md:opacity-0 md:group-hover:opacity-100"
+                    title="Copy talking point"
+                  >
+                    {copiedIndex === idx ? (
+                      <Check size={14} className="text-accent-green" />
+                    ) : (
+                      <Copy size={14} />
+                    )}
+                  </button>
+                </div>
+              ))
+            ) : (
+              <p className="text-xs text-text-muted font-mono italic">No Talking Points synthesized.</p>
+            )}
+          </div>
+        )}
       </div>
 
       {/* Recent News */}

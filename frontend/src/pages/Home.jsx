@@ -7,6 +7,14 @@ export default function Home() {
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const [historyCount, setHistoryCount] = useState(null);
+  const [purpose, setPurpose] = useState(() => {
+    return localStorage.getItem('last_used_purpose') || 'general';
+  });
+
+  const handlePurposeChange = (val) => {
+    setPurpose(val);
+    localStorage.setItem('last_used_purpose', val);
+  };
   
   const inputRef = useRef(null);
   const navigate = useNavigate();
@@ -64,7 +72,7 @@ export default function Home() {
       const res = await fetch(`${apiUrl}/research`, {
         method: 'POST',
         headers,
-        body: JSON.stringify({ company: term })
+        body: JSON.stringify({ company: term, purpose })
       });
 
       if (!res.ok) {
@@ -103,8 +111,34 @@ export default function Home() {
         {/* Input Form */}
         <form 
           onSubmit={(e) => { e.preventDefault(); handleSubmit(); }}
-          className="space-y-4 animate-fade-in-up [animation-delay:150ms] opacity-0 [animation-fill-mode:forwards]"
+          className="space-y-5 animate-fade-in-up [animation-delay:150ms] opacity-0 [animation-fill-mode:forwards]"
         >
+          {/* Purpose Selector Pills */}
+          <div className="flex flex-wrap items-center justify-center gap-1 p-1 bg-bg-surface border border-border-subtle/60 rounded-xl w-fit mx-auto select-none shadow-sm">
+            {[
+              { value: 'general', label: 'General' },
+              { value: 'sales', label: 'Sales' },
+              { value: 'investor', label: 'Investor' },
+              { value: 'job_seeker', label: 'Job Seeker' }
+            ].map((p) => {
+              const isActive = purpose === p.value;
+              return (
+                <button
+                  key={p.value}
+                  type="button"
+                  disabled={loading}
+                  onClick={() => handlePurposeChange(p.value)}
+                  className={`px-3 py-1.5 text-xs font-sans font-medium rounded-lg transition-all duration-150 cursor-pointer ${
+                    isActive 
+                      ? 'bg-primary text-bg-elevated shadow-xs font-semibold' 
+                      : 'text-text-secondary hover:text-text-primary hover:bg-bg-elevated/30'
+                  }`}
+                >
+                  {p.label}
+                </button>
+              );
+            })}
+          </div>
           <div className="relative flex items-center">
             <input
               ref={inputRef}

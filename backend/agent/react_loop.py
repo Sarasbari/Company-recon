@@ -4,7 +4,7 @@ import time
 import asyncio
 import httpx
 from anthropic import AsyncAnthropic
-from backend.agent.prompts import build_system_prompt, SYNTHESIS_PROMPT
+from backend.agent.prompts import build_system_prompt, build_synthesis_prompt
 from backend.tools.dispatcher import dispatch_tool
 from backend.models import Dossier
 from backend.logging_config import logger
@@ -68,13 +68,13 @@ def populate_agent_metadata(dossier: dict, iteration: int, tool_calls: int, dura
         dossier["agent_metadata"]["steps"] = list(queue.history)
 
 
-async def run_agent(company_name: str, queue: asyncio.Queue = None) -> dict:
+async def run_agent(company_name: str, queue: asyncio.Queue = None, purpose: str = "general") -> dict:
     """
     Executes the ReAct agent loop for a company name with retry on validation failure.
     """
     for attempt in range(2):
         try:
-            dossier = await _run_agent_internal(company_name, queue)
+            dossier = await _run_agent_internal(company_name, queue, purpose)
             if validate_dossier_company(company_name, dossier):
                 return dossier
                 
@@ -89,7 +89,7 @@ async def run_agent(company_name: str, queue: asyncio.Queue = None) -> dict:
                 raise e
 
 
-async def _run_agent_internal(company_name: str, queue: asyncio.Queue = None) -> dict:
+async def _run_agent_internal(company_name: str, queue: asyncio.Queue = None, purpose: str = "general") -> dict:
     """
     Internal ReAct agent runner. Routes to the appropriate LLM provider.
     Priority: Gemini > Groq > Anthropic.
@@ -127,7 +127,7 @@ async def _run_agent_internal(company_name: str, queue: asyncio.Queue = None) ->
     last_error = None
     for provider_name, provider_fn in providers:
         try:
-            return await provider_fn(company_name, queue, start_time)
+            return await provider_fn(company_name, queue, start_time, purpose)
         except Exception as e:
             last_error = e
             logger.warning(f"{provider_name} provider failed: {str(e)}. Trying next provider...")
@@ -218,13 +218,13 @@ def get_gemini_tools():
 
 # ─── Anthropic Agent ────────────────────────────────────────────────────────
 
-async def run_anthropic_agent(company_name: str, queue: asyncio.Queue = None, start_time: float = None) -> dict:
+async def run_anthropic_agent(company_name: str, queue: asyncio.Queue = None, start_time: float = None, purpose: str = "general") -> dict:
     """
     Runs the ReAct loop using Anthropic Claude API.
     """
     anthropic_key = os.getenv("ANTHROPIC_API_KEY")
     client = AsyncAnthropic(api_key=anthropic_key)
-    system_prompt = build_system_prompt(company_name)
+    system_prompt = build_system_prompt(company_name, purpose)
     tools = get_anthropic_tools()
 
     messages = []
@@ -316,7 +316,7 @@ async def run_anthropic_agent(company_name: str, queue: asyncio.Queue = None, st
             await queue.put({"type": "reason", "text": "Synthesizing research logs into structured dossier..."})
 
         synthesis_messages = messages + [
-            {"role": "user", "content": SYNTHESIS_PROMPT}
+            {"role": "user", "content": build_synthesis_prompt(purpose)}
         ]
 
         synthesis_response = await client.messages.create(
@@ -342,6 +342,9 @@ async def run_anthropic_agent(company_name: str, queue: asyncio.Queue = None, st
         
         # Validate through Pydantic
         dossier = validate_dossier_with_pydantic(dossier)
+        dossier["purpose"] = purpose
+        if purpose == "general" and "purpose_module" in dossier:
+            del dossier["purpose_module"]
         
         # Populate agent metadata
         populate_agent_metadata(dossier, iteration, tool_calls_count, duration, "claude-3-5-haiku + claude-3-5-sonnet", queue)
@@ -455,13 +458,13 @@ async def gemini_post_with_retry(client, url, json_payload, queue=None, max_retr
     return response.json()
 
 
-async def run_gemini_agent(company_name: str, queue: asyncio.Queue = None, start_time: float = None) -> dict:
+async def run_gemini_agent(company_name: str, queue: asyncio.Queue = None, start_time: float = None, purpose: str = "general") -> dict:
     """
     Runs the ReAct loop using the free Google Gemini API.
     """
     api_key = os.getenv("GEMINI_API_KEY")
     url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key={api_key}"
-    system_prompt = build_system_prompt(company_name)
+    system_prompt = build_system_prompt(company_name, purpose)
     gemini_tools = get_gemini_tools()
 
     contents = []
@@ -559,7 +562,7 @@ async def run_gemini_agent(company_name: str, queue: asyncio.Queue = None, start
         synthesis_payload = {
             "contents": contents + [{
                 "role": "user",
-                "parts": [{"text": SYNTHESIS_PROMPT}]
+                "parts": [{"text": build_synthesis_prompt(purpose)}]
             }],
             "systemInstruction": {
                 "parts": [{"text": "You are a professional B2B sales analyst."}]
@@ -584,6 +587,9 @@ async def run_gemini_agent(company_name: str, queue: asyncio.Queue = None, start
         
         # Validate through Pydantic
         dossier = validate_dossier_with_pydantic(dossier)
+        dossier["purpose"] = purpose
+        if purpose == "general" and "purpose_module" in dossier:
+            del dossier["purpose_module"]
         
         populate_agent_metadata(dossier, iteration, tool_calls_count, duration, "gemini-2.0-flash", queue)
         
@@ -642,7 +648,7 @@ async def groq_chat_completion_with_retry(client, **kwargs):
             raise e
 
 
-async def run_groq_agent(company_name: str, queue: asyncio.Queue = None, start_time: float = None) -> dict:
+async def run_groq_agent(company_name: str, queue: asyncio.Queue = None, start_time: float = None, purpose: str = "general") -> dict:
     """
     Runs the ReAct loop using Groq's API with automatic fallback cascade.
     Order: llama-3.3-70b-versatile -> llama-3.1-8b-instant
@@ -651,7 +657,7 @@ async def run_groq_agent(company_name: str, queue: asyncio.Queue = None, start_t
     last_error = None
     for model in models:
         try:
-            return await _run_groq_agent_with_model(company_name, model, queue, start_time)
+            return await _run_groq_agent_with_model(company_name, model, queue, start_time, purpose)
         except Exception as e:
             last_error = e
             err_str = str(e).lower()
@@ -667,7 +673,7 @@ async def run_groq_agent(company_name: str, queue: asyncio.Queue = None, start_t
     raise last_error
 
 
-async def _run_groq_agent_with_model(company_name: str, model_name: str, queue: asyncio.Queue = None, start_time: float = None) -> dict:
+async def _run_groq_agent_with_model(company_name: str, model_name: str, queue: asyncio.Queue = None, start_time: float = None, purpose: str = "general") -> dict:
     """
     Runs the ReAct loop using Groq's OpenAI-compatible chat completions API with tool calling for a specific model.
     """
@@ -675,7 +681,7 @@ async def _run_groq_agent_with_model(company_name: str, model_name: str, queue: 
 
     api_key = os.getenv("GROQ_API_KEY")
     client = AsyncGroq(api_key=api_key)
-    system_prompt = build_system_prompt(company_name)
+    system_prompt = build_system_prompt(company_name, purpose)
 
     # Groq uses OpenAI-compatible tool format
     tools = [
@@ -807,7 +813,7 @@ async def _run_groq_agent_with_model(company_name: str, model_name: str, queue: 
             await queue.put({"type": "reason", "text": "Synthesizing research logs into structured dossier..."})
 
         synthesis_messages = messages + [
-            {"role": "user", "content": SYNTHESIS_PROMPT}
+            {"role": "user", "content": build_synthesis_prompt(purpose)}
         ]
 
         synthesis_response = await groq_chat_completion_with_retry(
@@ -833,6 +839,9 @@ async def _run_groq_agent_with_model(company_name: str, model_name: str, queue: 
 
         # Validate through Pydantic
         dossier = validate_dossier_with_pydantic(dossier)
+        dossier["purpose"] = purpose
+        if purpose == "general" and "purpose_module" in dossier:
+            del dossier["purpose_module"]
 
         populate_agent_metadata(dossier, iteration, tool_calls_count, duration, f"groq/{model_name}", queue)
 

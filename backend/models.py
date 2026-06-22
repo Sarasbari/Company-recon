@@ -47,6 +47,8 @@ class Dossier(BaseModel):
     key_people: List[KeyPerson] = []
     recent_news: List[NewsItem] = []
     talking_points: List[str] = []
+    purpose: Optional[str] = "general"
+    purpose_module: Optional[dict] = None
     sources: List[str] = []
     agent_metadata: AgentMetadata = Field(default_factory=AgentMetadata)
 

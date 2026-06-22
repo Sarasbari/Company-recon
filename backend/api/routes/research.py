@@ -5,7 +5,7 @@ from collections import defaultdict
 from fastapi import APIRouter, Request, HTTPException, BackgroundTasks
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field
-from typing import Optional, Dict
+from typing import Optional, Dict, Literal
 
 from backend.logging_config import logger
 
@@ -30,6 +30,7 @@ RATE_LIMIT_WINDOW = 3600  # 1 hour in seconds
 class ResearchRequest(BaseModel):
     company: str = Field(..., min_length=2, description="The name of the company to research.")
     website: Optional[str] = Field(None, description="Optional website URL hint.")
+    purpose: Literal["general", "sales", "investor", "job_seeker"] = "general"
 
 async def cleanup_job_status_delayed(job_id: str, delay: int = 300):
     """
@@ -40,7 +41,7 @@ async def cleanup_job_status_delayed(job_id: str, delay: int = 300):
     if job_id in job_status_store:
         del job_status_store[job_id]
 
-async def run_agent_background(company: str, job_id: str, queue: asyncio.Queue, user_id: Optional[str], db_dossier_id: Optional[str]):
+async def run_agent_background(company: str, job_id: str, queue: asyncio.Queue, user_id: Optional[str], db_dossier_id: Optional[str], purpose: str = "general"):
     """
     Background worker that runs the agent loop under a concurrency lock.
     """
@@ -52,7 +53,7 @@ async def run_agent_background(company: str, job_id: str, queue: asyncio.Queue, 
             if db_dossier_id:
                 await update_dossier(db_dossier_id, "running")
                 
-            dossier = await run_agent(company, queue)
+            dossier = await run_agent(company, queue, purpose)
             
             job_status_store[job_id] = {"status": "complete", "dossier": dossier}
             if db_dossier_id:
@@ -111,7 +112,7 @@ async def start_research(request: Request, payload: ResearchRequest, background_
         db_dossier_id = await save_dossier(user_id=user_id, company=company_name, status="pending", dossier_id=job_id)
 
     # Start agent loop in background
-    background_tasks.add_task(run_agent_background, company_name, job_id, queue, user_id, db_dossier_id)
+    background_tasks.add_task(run_agent_background, company_name, job_id, queue, user_id, db_dossier_id, payload.purpose)
 
     return {
         "job_id": job_id,
